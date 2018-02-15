@@ -33,4 +33,4 @@ libtool
 py-compile
 stamp-h1
 src/.libs
-src/usbflux
+src/usbfluxd
