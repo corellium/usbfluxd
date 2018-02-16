@@ -924,7 +924,7 @@ static void process_usbmux_send(struct mux_client *client)
 		client->usbmux_events &= ~POLLOUT;
 		return;
 	}
-usbmuxd_log(LL_INFO, "%s: sending %d to usbmuxd", __func__, client->usbmux_ob_size);
+usbmuxd_log(LL_INFO, "%s: sending %d to usbmuxd (%d)", __func__, client->usbmux_ob_size, client->usbmuxfd);
 	res = send(client->usbmuxfd, client->usbmux_ob_buf, client->usbmux_ob_size, 0);
 	if(res <= 0) {
 		usbmuxd_log(LL_ERROR, "Send to usbmux fd %d failed: %d %s", client->usbmuxfd, res, strerror(errno));
@@ -1096,10 +1096,21 @@ void client_usbmux_process(int fd, short events)
 
 	if (client->state == CLIENT_CONNECTED) {
 		if(events & POLLIN) {
-			int r = recv(client->usbmuxfd, client->usbmux_ib_buf, client->usbmux_ib_capacity, 0);
+			if (client->usbmux_ib_size > 0) {
+				if ((int64_t)client->usbmux_ib_capacity - (int64_t)client->usbmux_ib_size <= 0) {
+					usbmuxd_log(LL_WARNING, "%s: usbmux_ib_buf buffer is full, let's try this next loop iteration");
+					return;
+				}
+			}
+			int r = recv(client->usbmuxfd, client->usbmux_ib_buf + client->usbmux_ib_size, client->usbmux_ib_capacity - client->usbmux_ib_size, 0);
+			if (r <= 0) {
+				usbmuxd_log(LL_ERROR, "%s: failed to read from usbmuxd", __func__);
+				client_close(client);
+				return;
+			}
 			if (r > 0) {
-				usbmuxd_log(LL_INFO, "%s: read %d bytes from usbmuxd", __func__, r);
-				client->usbmux_ib_size = r;
+				usbmuxd_log(LL_INFO, "%s: read %d bytes from usbmuxd (fd %d)", __func__, r, client->usbmuxfd);
+				client->usbmux_ib_size += r;
 				client->events |= POLLOUT;
 			}
 		}
@@ -1156,11 +1167,21 @@ void client_process(int fd, short events)
 			//usbmuxd_log(LL_INFO, "writing to client");
 			if (client->usbmux_ib_size > 0) {
 				usbmuxd_log(LL_INFO, "sending %d bytes to client", client->usbmux_ib_size);
-				client_write(client, client->usbmux_ib_buf, client->usbmux_ib_size);
-				client->usbmux_ib_size = 0;
-				client->events |= POLLIN;
+				int res = client_write(client, client->usbmux_ib_buf, client->usbmux_ib_size);
+				if(res <= 0) {
+					usbmuxd_log(LL_ERROR, "Send to client fd %d failed: %d %s", client->fd, res, strerror(errno));
+					client_close(client);
+					return;
+				}
+				if((uint32_t)res == client->usbmux_ib_size) {
+					client->usbmux_ib_size = 0;
+					client->events &= ~POLLOUT;
+					client->events |= POLLIN;
+				} else {
+					client->usbmux_ib_size -= res;
+					memmove(client->usbmux_ib_buf, client->usbmux_ib_buf + res, client->usbmux_ib_size);
+				}
 			}
-			client->events &= ~POLLOUT;
 		}
 	} else {
 		if(events & POLLIN) {
