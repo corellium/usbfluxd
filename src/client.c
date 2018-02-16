@@ -273,9 +273,9 @@ int client_accept(int listenfd)
 	client->usbmux_ob_buf = malloc(REPLY_BUF_SIZE);
 	client->usbmux_ob_size = 0;
 	client->usbmux_ob_capacity = REPLY_BUF_SIZE;
-	client->usbmux_ib_buf = malloc(REPLY_BUF_SIZE);
+	client->usbmux_ib_buf = malloc(REPLY_BUF_SIZE * 8);
 	client->usbmux_ib_size = 0;
-	client->usbmux_ib_capacity = REPLY_BUF_SIZE;
+	client->usbmux_ib_capacity = REPLY_BUF_SIZE * 8;
 
 	pthread_mutex_lock(&client_list_mutex);
 	collection_add(&client_list, client);
