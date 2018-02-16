@@ -1098,7 +1098,7 @@ void client_usbmux_process(int fd, short events)
 		if(events & POLLIN) {
 			if (client->usbmux_ib_size > 0) {
 				if ((int64_t)client->usbmux_ib_capacity - (int64_t)client->usbmux_ib_size <= 0) {
-					usbmuxd_log(LL_WARNING, "%s: usbmux_ib_buf buffer is full, let's try this next loop iteration");
+					usbmuxd_log(LL_WARNING, "%s: usbmux_ib_buf buffer is full, let's try this next loop iteration", __func__);
 					return;
 				}
 			}
