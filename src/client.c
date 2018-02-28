@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netdb.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <pthread.h>
@@ -86,7 +87,9 @@ enum {
 	CMD_CONNECT = 2,
 	CMD_LIST_DEVICES = 3,
 	CMD_READ_PAIR_RECORD = 4,
-	CMD_READ_BUID = 5
+	CMD_SAVE_PAIR_RECORD = 5,
+	CMD_DELETE_PAIR_RECORD = 6,
+	CMD_READ_BUID = 7
 };
 
 static struct collection client_list;
@@ -219,6 +222,61 @@ static int socket_connect_unix(const char *filename)
 	return sfd;
 }
 
+static int socket_connect(const char *addr, uint16_t port)
+{
+	int sfd = -1;
+	int yes = 1;
+	struct hostent *hp;
+	struct sockaddr_in saddr;
+
+	if (!addr) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if ((hp = gethostbyname(addr)) == NULL) {
+		usbmuxd_log(LL_ERROR, "%s: unknown host '%s'", __func__, addr);
+		return -1;
+	}
+
+	if (!hp->h_addr) {
+		usbmuxd_log(LL_ERROR, "%s: gethostbyname returned NULL address!", __func__);
+		return -1;
+	}
+
+	if (0 > (sfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP))) {
+		usbmuxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
+		return -1;
+	}
+
+	if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (void*)&yes, sizeof(int)) == -1) {
+		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
+		socket_close(sfd);
+		return -1;
+	}
+
+#ifdef SO_NOSIGPIPE
+	if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
+		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
+		socket_close(sfd);
+		return -1;
+	}
+#endif
+
+	memset((void *) &saddr, 0, sizeof(saddr));
+	saddr.sin_family = AF_INET;
+	saddr.sin_addr.s_addr = *(uint32_t *) hp->h_addr;
+	saddr.sin_port = htons(port);
+
+	if (connect(sfd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0) {
+		usbmuxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
+		socket_close(sfd);
+		return -2;
+	}
+
+	return sfd;
+}
+
 /**
  * Wait for an inbound connection on the usbmuxd socket
  * and create a new mux_client instance for it, and store
@@ -239,7 +297,8 @@ int client_accept(int listenfd)
 		return cfd;
 	}
 
-	int origfd = socket_connect_unix("/var/run/usbmuxd.orig");
+	// FIXME THIS NEEDS TO BE DYNAMIC OF COURSE
+	int origfd = socket_connect("10.11.1.14", 5000);
 	if (origfd < 0) {
 		close(cfd);
 		usbmuxd_log(LL_ERROR, "failed to connect to original usbmuxd socket");
@@ -667,19 +726,78 @@ static int client_handle_command_result(struct mux_client *client, struct usbmux
 		
 	}
 
-if (hdr->message == MESSAGE_PLIST) {
 	char *payload = (char*)(hdr) + sizeof(struct usbmuxd_header);
 	uint32_t payload_size = hdr->length - sizeof(struct usbmuxd_header);
-	plist_t dict = NULL;
-	plist_from_xml(payload, payload_size, &dict);
-	uint32_t xlen = 0;
-	char *xml = NULL;
-	plist_to_xml(dict, &xml, &xlen);
-	puts(xml);
-}
+	int needsfree = 0;
+
+	if (hdr->message == MESSAGE_PLIST) {
+		plist_t dict = NULL;
+		plist_from_xml(payload, payload_size, &dict);
+
+		// FIXME BEGIN
+		// FIXME THIS NEEDS TO BE FIXED ON THE REMOTE SIDE
+		plist_t devices = plist_dict_get_item(dict, "DeviceList");
+		if (devices && plist_get_node_type(devices) == PLIST_ARRAY) {
+			uint32_t i;
+			for (i = 0; i < plist_array_get_size(devices); i++) {
+				plist_t dev = plist_array_get_item(devices, i);
+				plist_t props = plist_dict_get_item(dev, "Properties");
+				plist_t ser = plist_dict_get_item(props, "SerialNumber");
+				char *sernum = NULL;
+				plist_get_string_val(ser, &sernum);
+				if (!sernum || (strlen(sernum) != 40)) {
+					plist_dict_set_item(props, "SerialNumber", plist_new_string("024738b146c3093d04c116977b8c9ce2c19cd610"));
+				}
+			}
+
+			payload_size = 0;
+			payload = NULL;
+			plist_to_xml(dict, &payload, &payload_size);
+
+			hdr->length = sizeof(struct usbmuxd_header) + payload_size;
+			needsfree = 1;
+		} else {
+			plist_t msg = plist_dict_get_item(dict, "MessageType");
+			if (msg) {
+				char *msgtype = NULL;
+				plist_get_string_val(msg, &msgtype);
+				if (strcmp(msgtype, "Attached") == 0) {
+					plist_t props = plist_dict_get_item(dict, "Properties");
+					plist_t ser = plist_dict_get_item(props, "SerialNumber");
+					char *sernum = NULL;
+					plist_get_string_val(ser, &sernum);
+					if (!sernum || (strlen(sernum) != 40)) {
+						plist_dict_set_item(props, "SerialNumber", plist_new_string("024738b146c3093d04c116977b8c9ce2c19cd610"));
+					}
+				}
+			}
+
+			payload_size = 0;
+			payload = NULL;
+			plist_to_xml(dict, &payload, &payload_size);
+
+			hdr->length = sizeof(struct usbmuxd_header) + payload_size;
+			needsfree = 1;
+		}
+		// FIXME END
+	}
 
 	/* pass the info back to the client */
-	send_pkt_raw(client, hdr, hdr->length);
+	send_pkt_raw(client, hdr, sizeof(struct usbmuxd_header));
+	if (payload_size > 0) {
+		send_pkt_raw(client, payload, payload_size);
+	}
+	if (needsfree) {
+		free(payload);
+	}
+
+	if (client->last_command == CMD_CONNECT) {
+		client->connect_tag = client->last_tag;
+		client->state = CLIENT_CONNECTING2;
+	} else if (client->last_command == CMD_LISTEN) {
+		//start_listen(client);
+	}
+	client->last_command = -1;
 
 	return res;
 }
@@ -837,7 +955,15 @@ usbmuxd_log(LL_NOTICE, "Yo message is %s", message);
 					*/
 					return 0;
 				} else if (!strcmp(message, "SavePairRecord")) {
-					uint32_t rval = RESULT_OK;
+					free(message);
+					plist_free(dict);
+
+					if (usbmux_send_pkt(client, hdr, hdr->length) < 0) {
+						return -1;
+					}
+					client->last_command = CMD_SAVE_PAIR_RECORD;
+
+					/*uint32_t rval = RESULT_OK;
 					free(message);
 					char* record_id = plist_dict_get_string_val(dict, "PairRecordID");
 					char* record_data = NULL;
@@ -859,10 +985,18 @@ usbmuxd_log(LL_NOTICE, "Yo message is %s", message);
 					}
 					free(record_data);
 					if (send_result(client, hdr->tag, rval) < 0)
-						return -1;
+						return -1;*/
 					return 0;
 				} else if (!strcmp(message, "DeletePairRecord")) {
-					uint32_t rval = RESULT_OK;
+					free(message);
+					plist_free(dict);
+
+					if (usbmux_send_pkt(client, hdr, hdr->length) < 0) {
+						return -1;
+					}
+					client->last_command = CMD_DELETE_PAIR_RECORD;
+
+					/*uint32_t rval = RESULT_OK;
 					free(message);
 					char* record_id = plist_dict_get_string_val(dict, "PairRecordID");
 					plist_free(dict);
@@ -876,7 +1010,7 @@ usbmuxd_log(LL_NOTICE, "Yo message is %s", message);
 						rval = EINVAL;
 					}
 					if (send_result(client, hdr->tag, rval) < 0)
-						return -1;
+						return -1;*/
 					return 0;
 				} else {
 					usbmuxd_log(LL_ERROR, "Unexpected command '%s' received!", message);
