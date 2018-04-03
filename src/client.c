@@ -1212,7 +1212,7 @@ void client_usbmux_process(int fd, short events)
 				}
 			}
 			int r = recv(client->usbmuxfd, client->usbmux_ib_buf + client->usbmux_ib_size, client->usbmux_ib_capacity - client->usbmux_ib_size, 0);
-			if (r < 0) {
+			if (r <= 0) {
 				usbmuxd_log(LL_ERROR, "%s: failed to read from usbmuxd", __func__);
 				client_close(client);
 				return;
