@@ -731,55 +731,10 @@ static int client_handle_command_result(struct mux_client *client, struct usbmux
 	int needsfree = 0;
 
 	if (hdr->message == MESSAGE_PLIST) {
-		plist_t dict = NULL;
-		plist_from_xml(payload, payload_size, &dict);
-
-		// FIXME BEGIN
-		// FIXME THIS NEEDS TO BE FIXED ON THE REMOTE SIDE
-		plist_t devices = plist_dict_get_item(dict, "DeviceList");
-		if (devices && plist_get_node_type(devices) == PLIST_ARRAY) {
-			uint32_t i;
-			for (i = 0; i < plist_array_get_size(devices); i++) {
-				plist_t dev = plist_array_get_item(devices, i);
-				plist_t props = plist_dict_get_item(dev, "Properties");
-				plist_t ser = plist_dict_get_item(props, "SerialNumber");
-				char *sernum = NULL;
-				plist_get_string_val(ser, &sernum);
-				if (!sernum || (strlen(sernum) != 40)) {
-					plist_dict_set_item(props, "SerialNumber", plist_new_string("024738b146c3093d04c116977b8c9ce2c19cd610"));
-				}
-			}
-
-			payload_size = 0;
-			payload = NULL;
-			plist_to_xml(dict, &payload, &payload_size);
-
-			hdr->length = sizeof(struct usbmuxd_header) + payload_size;
-			needsfree = 1;
-		} else {
-			plist_t msg = plist_dict_get_item(dict, "MessageType");
-			if (msg) {
-				char *msgtype = NULL;
-				plist_get_string_val(msg, &msgtype);
-				if (strcmp(msgtype, "Attached") == 0) {
-					plist_t props = plist_dict_get_item(dict, "Properties");
-					plist_t ser = plist_dict_get_item(props, "SerialNumber");
-					char *sernum = NULL;
-					plist_get_string_val(ser, &sernum);
-					if (!sernum || (strlen(sernum) != 40)) {
-						plist_dict_set_item(props, "SerialNumber", plist_new_string("024738b146c3093d04c116977b8c9ce2c19cd610"));
-					}
-				}
-			}
-
-			payload_size = 0;
-			payload = NULL;
-			plist_to_xml(dict, &payload, &payload_size);
-
-			hdr->length = sizeof(struct usbmuxd_header) + payload_size;
-			needsfree = 1;
-		}
-		// FIXME END
+		// IF WE NEED TO MODIFY ONE OF THE RESULTS BEFORE GOING BACK TO THE CLIENT, HERE IS THE PLACE
+		//plist_t dict = NULL;
+		//plist_from_xml(payload, payload_size, &dict);
+		//plist_free(dict);
 	}
 
 	/* pass the info back to the client */
