@@ -48,6 +48,26 @@
 #define CMD_BUF_SIZE	0x10000
 #define REPLY_BUF_SIZE	0x10000
 
+// {{{ FIXME this is temporary
+static int remote_port = 5000;
+static char *remote_host = NULL;
+
+void client_set_remote_port(int port)
+{
+	remote_port = port;
+}
+
+void client_set_remote_host(char *host)
+{
+	free(remote_host);
+	if (host) {
+		remote_host = strdup(host);
+	} else {
+		remote_host = NULL;
+	}
+}
+// end FIXME }}}
+
 enum client_state {
 	CLIENT_COMMAND,		// waiting for command
 	CLIENT_LISTEN,		// listening for devices
@@ -298,7 +318,7 @@ int client_accept(int listenfd)
 	}
 
 	// FIXME THIS NEEDS TO BE DYNAMIC OF COURSE
-	int origfd = socket_connect("10.11.1.14", 5000);
+	int origfd = socket_connect(((remote_host) ? remote_host : "10.11.1.8"), remote_port);
 	if (origfd < 0) {
 		close(cfd);
 		usbmuxd_log(LL_ERROR, "failed to connect to original usbmuxd socket");

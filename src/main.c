@@ -384,6 +384,9 @@ static void usage()
 	printf("\n");
 }
 
+extern void client_set_remote_port(int port);
+extern void client_set_remote_host(char *host);
+
 static void parse_opts(int argc, char **argv)
 {
 	static struct option longopts[] = {
@@ -402,16 +405,17 @@ static void parse_opts(int argc, char **argv)
 		{"exit", 0, NULL, 'x'},
 		{"force-exit", 0, NULL, 'X'},
 		{"version", 0, NULL, 'V'},
+		{"remote", required_argument, NULL, 'r'},
 		{NULL, 0, NULL, 0}
 	};
 	int c;
 
 #ifdef HAVE_SYSTEMD
-	const char* opts_spec = "hfvVuU:xXsnz";
+	const char* opts_spec = "hfvVuU:xXsnzr:";
 #elif HAVE_UDEV
-	const char* opts_spec = "hfvVuU:xXnz";
+	const char* opts_spec = "hfvVuU:xXnzr:";
 #else
-	const char* opts_spec = "hfvVU:xXnz";
+	const char* opts_spec = "hfvVU:xXnzr:";
 #endif
 
 	while (1) {
@@ -463,6 +467,21 @@ static void parse_opts(int argc, char **argv)
 			opt_exit = 1;
 			exit_signal = SIGTERM;
 			break;
+		case 'r': {
+			char *colon = strchr(optarg, ':');
+			if (colon) {
+				size_t hostSize = (uintptr_t)(colon - optarg + 1);
+				char *host = calloc(1, hostSize);
+				strncpy(host, optarg, hostSize - 1);
+				host[hostSize - 1] = 0;
+				client_set_remote_port(strtoul(colon + 1, NULL, 10));
+				client_set_remote_host(host);
+				free(host);
+			} else {
+				client_set_remote_host(optarg);
+			}
+			break;
+		}
 		default:
 			usage();
 			exit(2);
