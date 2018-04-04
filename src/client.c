@@ -217,6 +217,16 @@ static int socket_connect_unix(const char *filename)
 		return -1;
 	}
 
+	int sndsize = 0x20000;
+	if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(int)) == -1) {
+		perror("setsockopt()");
+	}
+
+	int rcvsize = 0x20000;
+	if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(int)) == -1) {
+		perror("setsockopt()");
+	}
+
 #ifdef SO_NOSIGPIPE
 	if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
 		usbmuxd_log(LL_ERROR, "setsockopt(): %s", strerror(errno));
@@ -273,6 +283,16 @@ static int socket_connect(const char *addr, uint16_t port)
 		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
 		socket_close(sfd);
 		return -1;
+	}
+
+	int sndsize = 0x20000;
+	if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(int)) == -1) {
+		perror("setsockopt()");
+	}
+
+	int rcvsize = 0x20000;
+	if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(int)) == -1) {
+		perror("setsockopt()");
 	}
 
 #ifdef SO_NOSIGPIPE
@@ -332,6 +352,16 @@ int client_accept(int listenfd)
 		if (fcntl(cfd, F_SETFL, flags | O_NONBLOCK) < 0) {
 			usbmuxd_log(LL_ERROR, "ERROR: Could not set socket to non-blocking mode");
 		}
+	}
+
+	int sndsize = 0x20000;
+	if (setsockopt(cfd, SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(int)) == -1) {
+		perror("setsockopt()");
+	}
+
+	int rcvsize = 0x20000;
+	if (setsockopt(cfd, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(int)) == -1) {
+		perror("setsockopt()");
 	}
 
 	struct mux_client *client;
