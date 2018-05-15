@@ -29,7 +29,8 @@ enum fdowner {
 	FD_LISTEN,
 	FD_CLIENT,
 	FD_USB,
-	FD_USBMUX
+	FD_USBMUX,
+	FD_REMOTE
 };
 
 struct fdlist {

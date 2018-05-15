@@ -110,6 +110,7 @@ struct mux_connection
 
 struct mux_device
 {
+	struct device_info dev;
 	struct usb_device *usbdev;
 	int id;
 	enum mux_dev_state state;
@@ -122,6 +123,8 @@ struct mux_device
 	int version;
 	uint16_t rx_seq;
 	uint16_t tx_seq;
+	char *host;
+	uint16_t port;
 };
 
 static struct collection device_list;
@@ -353,6 +356,19 @@ int device_start_connect(int device_id, uint16_t dport, struct mux_client *clien
 		return -RESULT_BADDEV;
 	}
 
+	if (!dev->host) {
+		usbmuxd_log(LL_ERROR, "Missing hostname in connect request fro device %d", device_id);
+		return -RESULT_BADDEV;
+	}
+	if (dev->port == 0) {
+		usbmuxd_log(LL_ERROR, "Missing hostname in connect request fro device %d", device_id);
+		return -RESULT_BADDEV;
+	}
+
+	usbmuxd_log(LL_INFO, "%s: connection request to %s:%d", __func__, dev->host, dev->port);
+
+
+#if 0
 	struct mux_connection *conn;
 	conn = malloc(sizeof(struct mux_connection));
 	memset(conn, 0, sizeof(struct mux_connection));
@@ -385,6 +401,7 @@ int device_start_connect(int device_id, uint16_t dport, struct mux_client *clien
 		return -RESULT_CONNREFUSED; //bleh
 	}
 	collection_add(&dev->connections, conn);
+#endif
 	return 0;
 }
 
@@ -807,32 +824,37 @@ void device_data_input(struct usb_device *usbdev, unsigned char *buffer, uint32_
 
 }
 
-int device_add(struct usb_device *usbdev)
+int device_add(struct device_info *device, const char *host, uint16_t port) /* FIXME: use a new remote_device_info struct and embed host and port there */
 {
+	/* TODO FIXME lots of things */
 	int res;
-	int id = get_next_device_id();
+	int id = get_next_device_id() | 0xF0000000;
 	struct mux_device *dev;
-	usbmuxd_log(LL_NOTICE, "Connecting to new device on location 0x%x as ID %d", usb_get_location(usbdev), id);
+	usbmuxd_log(LL_NOTICE, "Adding new remote device as ID 0x%x", id);
 	dev = malloc(sizeof(struct mux_device));
 	dev->id = id;
-	dev->usbdev = usbdev;
-	dev->state = MUXDEV_INIT;
-	dev->visible = 0;
-	dev->next_sport = 1;
-	dev->pktbuf = malloc(DEV_MRU);
-	dev->pktlen = 0;
-	dev->preflight_cb_data = NULL;
-	dev->version = 0;
-	struct version_header vh;
-	vh.major = htonl(2);
-	vh.minor = htonl(0);
-	vh.padding = 0;
-	if((res = send_packet(dev, MUX_PROTO_VERSION, &vh, NULL, 0)) < 0) {
-		usbmuxd_log(LL_ERROR, "Error sending version request packet to device %d", id);
-		free(dev->pktbuf);
-		free(dev);
-		return res;
-	}
+	memcpy(&(dev->dev), device, sizeof(struct device_info));
+	//dev->usbdev = usbdev;
+	dev->state = MUXDEV_ACTIVE; //INIT;
+	dev->visible = 1;
+	dev->host = strdup(host);
+	dev->port = port;
+	//dev->next_sport = 1;
+	//dev->pktbuf = malloc(DEV_MRU);
+	//dev->pktlen = 0;
+	//dev->preflight_cb_data = NULL;
+	//dev->version = 0;
+	//struct version_header vh;
+	//vh.major = htonl(2);
+	//vh.minor = htonl(0);
+	//vh.padding = 0;
+	//if((res = send_packet(dev, MUX_PROTO_VERSION, &vh, NULL, 0)) < 0) {
+	//	usbmuxd_log(LL_ERROR, "Error sending version request packet to device %d", id);
+	//	free(dev->pktbuf);
+	//	free(dev);
+	//	return res;
+	//}
+
 	pthread_mutex_lock(&device_list_mutex);
 	collection_add(&device_list, dev);
 	pthread_mutex_unlock(&device_list_mutex);
@@ -923,10 +945,10 @@ int device_get_list(int include_hidden, struct device_info **devices)
 	FOREACH(struct mux_device *dev, &device_list) {
 		if((dev->state == MUXDEV_ACTIVE) && (include_hidden || dev->visible)) {
 			p->id = dev->id;
-			p->serial = usb_get_serial(dev->usbdev);
-			p->location = usb_get_location(dev->usbdev);
-			p->pid = usb_get_pid(dev->usbdev);
-			p->speed = usb_get_speed(dev->usbdev);
+			p->serial = dev->dev.serial;
+			p->location = 0;
+			p->pid = dev->dev.pid;
+			p->speed = 480000000;
 			count++;
 			p++;
 		}

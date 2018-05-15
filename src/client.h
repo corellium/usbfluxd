@@ -23,18 +23,26 @@
 
 #include <stdint.h>
 #include "usbmuxd-proto.h"
+#include "usbmux_remote.h"
 
 struct device_info;
 struct mux_client;
+struct remote_mux;
 
 int client_read(struct mux_client *client, void *buffer, uint32_t len);
 int client_write(struct mux_client *client, void *buffer, uint32_t len);
 int client_set_events(struct mux_client *client, short events);
+int client_or_events(struct mux_client * client, short events);
+void client_close_notify(struct mux_client *client);
 void client_close(struct mux_client *client);
+void client_set_remote(struct mux_client *client, struct remote_mux *remote);
 int client_notify_connect(struct mux_client *client, enum usbmuxd_result result);
+void client_notify_remote_close(struct mux_client *client);
+int client_send_plist_pkt(struct mux_client *client, plist_t plist);
+int client_send_packet_data(struct mux_client *client, struct usbmuxd_header *hdr, void *payload, uint32_t payload_size);
 
-void client_device_add(struct device_info *dev);
-void client_device_remove(int device_id);
+void client_device_add(plist_t dev);
+void client_device_remove(uint32_t device_id);
 
 int client_accept(int fd);
 void client_get_fds(struct fdlist *list);

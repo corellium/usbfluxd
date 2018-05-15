@@ -62,6 +62,7 @@ AC_CHECK_FUNCS([ppoll clock_gettime])
 
 # Check for operating system
 AC_MSG_CHECKING([whether to enable WIN32 build settings])
+AC_LDADD=
 UDEV_SUB=
 SYSTEMD_SUB=
 case ${host_os} in
@@ -77,6 +78,8 @@ case ${host_os} in
     AC_MSG_RESULT([no])
     # No support for launchd yet
     activation_method="manual"
+    AC_DEFINE(HAVE_CFNETWORK, 1, [Define to enable CFNetwork support])
+    AC_LDADD="-framework CoreFoundation -framework CFNetwork"
     ;;
   *)
     win32=false
@@ -94,6 +97,7 @@ case ${host_os} in
     fi
     ;;
 esac
+AC_SUBST(AC_LDADD)
 AM_CONDITIONAL(WIN32, test x$win32 = xtrue)
 
 AC_SUBST([UDEV_SUB])

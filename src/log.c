@@ -71,7 +71,7 @@ void usbmuxd_log(enum loglevel level, const char *fmt, ...)
 	if(level > log_level)
 		return;
 
-	get_tick_count(&ts);
+	gettimeofday(&ts, NULL);
 	tp = localtime(&ts.tv_sec);
 
 	fs = malloc(20 + strlen(fmt));

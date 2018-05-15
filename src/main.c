@@ -47,6 +47,7 @@
 #include "usb.h"
 #include "device.h"
 #include "client.h"
+#include "usbmux_remote.h"
 #include "conf.h"
 
 static const char *socket_path = "/var/run/usbmuxd";
@@ -55,7 +56,7 @@ static const char *lockfile = "/var/run/usbmuxd.pid";
 int should_exit;
 int should_discover;
 
-static int verbose = 0;
+static int verbose = 1;
 static int foreground = 0;
 static int drop_privileges = 0;
 static const char *drop_user = NULL;
@@ -179,9 +180,12 @@ static int main_loop(int listenfd)
 	int to, cnt, i, dto;
 	struct fdlist pollfds;
 	struct timespec tspec;
+	struct timeval last_check = {0, 0};
 
 	sigset_t empty_sigset;
 	sigemptyset(&empty_sigset); // unmask all signals
+
+	should_discover = 1;
 
 	fdlist_create(&pollfds);
 	while(!should_exit) {
@@ -198,6 +202,7 @@ static int main_loop(int listenfd)
 		fdlist_add(&pollfds, FD_LISTEN, listenfd, POLLIN);
 		//usb_get_fds(&pollfds);
 		client_get_fds(&pollfds);
+		usbmux_remote_get_fds(&pollfds);
 		usbmuxd_log(LL_FLOOD, "fd count is %d", pollfds.count);
 
 		tspec.tv_sec = to / 1000;
@@ -223,6 +228,26 @@ static int main_loop(int listenfd)
 				return -1;
 			}
 			device_check_timeouts();*/
+			
+#if 0
+			if (should_discover) {
+				struct timeval now;
+				get_tick_count(&now);
+				uint64_t now_usec = now.tv_sec * 1000000 + now.tv_usec;
+				uint64_t last_usec = last_check.tv_sec * 1000000 + last_check.tv_usec;
+				if (last_usec == 0) {
+					get_tick_count(&last_check);
+				} else if ((now_usec - last_usec) > 5000000) {
+					// check for remote devices
+					get_tick_count(&last_check);
+
+					/* FIXME: here we need to handle remote devices that were added/removed since last invocation */
+					usbmuxd_log(LL_INFO, "TODO: CHECK FOR REMOTE DEVICES THAT HAVE BEEN ADDED/REMOVED");
+
+					should_discover = 0;
+				}
+			}
+#endif
 		} else {
 			int done_usb = 0;
 			for(i=0; i<pollfds.count; i++) {
@@ -245,8 +270,8 @@ static int main_loop(int listenfd)
 					if(pollfds.owners[i] == FD_CLIENT) {
 						client_process(pollfds.fds[i].fd, pollfds.fds[i].revents);
 					}
-					if(pollfds.owners[i] == FD_USBMUX) {
-						client_usbmux_process(pollfds.fds[i].fd, pollfds.fds[i].revents);
+					if(pollfds.owners[i] == FD_REMOTE) {
+						usbmux_remote_process(pollfds.fds[i].fd, pollfds.fds[i].revents);
 					}
 				}
 			}
@@ -519,7 +544,7 @@ int main(int argc, char *argv[])
 	set_signal_handlers();
 	signal(SIGPIPE, SIG_IGN);
 
-/*	if (rename("/var/run/usbmuxd", "/var/run/usbmuxd.orig") != 0) {
+/*	if (rename("/var/run/usbmuxd", USBMUXD_RENAMED_SOCKET) != 0) {
 		usbmuxd_log(LL_FATAL, "Could not rename usbmuxd socket file: %s", strerror(errno));
 		goto terminate;
 	}
@@ -706,13 +731,25 @@ int main(int argc, char *argv[])
 #endif
 
 	client_init();
-	//device_init();
+	usbmux_remote_init();
+	device_init();
+
 	//usbmuxd_log(LL_INFO, "Initializing USB");
 	//if((res = usb_init()) < 0)
 	//	goto terminate;
 	//
 	//usbmuxd_log(LL_INFO, "%d device%s detected", res, (res==1)?"":"s");
 
+/*	// FIXME: add initial device lookup here
+	struct device_info info;
+	info.id = 0xF0000001;
+	info.location = 0; //usb_get_location(dev->usbdev);
+	info.serial = "fe46f8da35f57262a633fa737bff671f4f7599f8"; // usb_get_serial(dev->usbdev);
+	info.pid = 0x12a8; //usb_get_pid(dev->usbdev);
+	info.speed = 480000000; //usb_get_speed(dev->usbdev);
+
+	device_add(&info, "10.11.1.10", 5000);
+*/
 	usbmuxd_log(LL_NOTICE, "Initialization complete");
 
 #if 0
@@ -738,6 +775,7 @@ int main(int argc, char *argv[])
 //	usb_shutdown();
 //	device_shutdown();
 	client_shutdown();
+	usbmux_remote_shutdown();
 	usbmuxd_log(LL_NOTICE, "Shutdown complete");
 
 terminate:

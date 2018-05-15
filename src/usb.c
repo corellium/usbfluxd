@@ -284,10 +284,10 @@ static void get_serial_callback(struct libusb_transfer *transfer)
 	libusb_free_transfer(transfer);
 
 	/* Finish setup now */
-	if(device_add(usbdev) < 0) {
+	/*if(device_add(usbdev) < 0) {
 		usb_disconnect(usbdev);
 		return;
-	}
+	}*/
 
 	// Spin up NUM_RX_LOOPS parallel usb data retrieval loops
 	// Old usbmuxds used only 1 rx loop, but that leaves the
