@@ -27,14 +27,8 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netdb.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <netinet/tcp.h>
 
 #ifdef HAVE_CFNETWORK
 #include <CoreFoundation/CoreFoundation.h>
@@ -43,8 +37,8 @@
 
 #include "usbmux_remote.h"
 #include "utils.h"
-#include "device.h"
 #include "log.h"
+#include "socket.h"
 
 #define REPLY_BUF_SIZE	0x10000
 
@@ -52,147 +46,6 @@ static struct collection remote_list;
 pthread_mutex_t remote_list_mutex;
 static plist_t remote_device_list = NULL;
 static uint8_t remote_id = 1;
-
-
-/* {{{ socket helper */
-static int socket_close(int sfd)
-{
-	return close(sfd);
-}
-
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
-#endif
-
-static int socket_connect_unix(const char *filename)
-{
-	struct sockaddr_un name;
-	int sfd = -1;
-	size_t size;
-	struct stat fst;
-#ifdef SO_NOSIGPIPE
-	int yes = 1;
-#endif
-
-	// check if socket file exists...
-	if (stat(filename, &fst) != 0) {
-		usbmuxd_log(LL_ERROR, "%s: stat '%s': %s", __func__, filename, strerror(errno));
-		return -1;
-	}
-	// ... and if it is a unix domain socket
-	if (!S_ISSOCK(fst.st_mode)) {
-		usbmuxd_log(LL_ERROR, "%s: File '%s' is not a socket!", __func__, filename);
-		return -1;
-	}
-	// make a new socket
-	if ((sfd = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0) {
-		usbmuxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
-		return -1;
-	}
-
-	int sndsize = 0x20000;
-	if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &sndsize, sizeof(int)) == -1) {
-		perror("setsockopt()");
-	}
-
-	int rcvsize = 0x20000;
-	if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, &rcvsize, sizeof(int)) == -1) {
-		perror("setsockopt()");
-	}
-
-#ifdef SO_NOSIGPIPE
-	if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "setsockopt(): %s", strerror(errno));
-		socket_close(sfd);
-		return -1;
-	}
-#endif
-
-	// and connect to 'filename'
-	name.sun_family = AF_LOCAL;
-	strncpy(name.sun_path, filename, sizeof(name.sun_path));
-	name.sun_path[sizeof(name.sun_path) - 1] = 0;
-
-	size = (offsetof(struct sockaddr_un, sun_path)
-			+ strlen(name.sun_path) + 1);
-
-	if (connect(sfd, (struct sockaddr *) &name, size) < 0) {
-		socket_close(sfd);
-		usbmuxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
-		return -1;
-	}
-
-	return sfd;
-}
-
-static int socket_connect(const char *addr, uint16_t port)
-{
-	int sfd = -1;
-	int yes = 1;
-	int bufsize = 0x20000;
-	struct hostent *hp;
-	struct sockaddr_in saddr;
-
-	if (!addr) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	if ((hp = gethostbyname(addr)) == NULL) {
-		usbmuxd_log(LL_ERROR, "%s: unknown host '%s'", __func__, addr);
-		return -1;
-	}
-
-	if (!hp->h_addr) {
-		usbmuxd_log(LL_ERROR, "%s: gethostbyname returned NULL address!", __func__);
-		return -1;
-	}
-
-	if (0 > (sfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP))) {
-		usbmuxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
-		return -1;
-	}
-
-	if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
-		socket_close(sfd);
-		return -1;
-	}
-
-#ifdef SO_NOSIGPIPE
-	if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
-		socket_close(sfd);
-		return -1;
-	}
-#endif
-
-	if (setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (void*)&yes, sizeof(int)) == -1) {
-		perror("Could not set TCP_NODELAY on socket");
-	}
-
-	if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(int)) == -1) {
-		perror("setsockopt()");
-	}
-
-	if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(int)) == -1) {
-		perror("setsockopt()");
-	}
-
-	memset((void *) &saddr, 0, sizeof(saddr));
-	saddr.sin_family = AF_INET;
-	saddr.sin_addr.s_addr = *(uint32_t *) hp->h_addr;
-	saddr.sin_port = htons(port);
-
-	if (connect(sfd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0) {
-		usbmuxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
-		socket_close(sfd);
-		return -2;
-	}
-
-	return sfd;
-}
-/* }}} */
 
 /* {{{ plist helper */
 typedef int (*plist_dict_foreach_func_t)(const char *key, plist_t value, void *context);

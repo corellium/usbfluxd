@@ -8,11 +8,9 @@ sbin_PROGRAMS = usbfluxd
 usbfluxd_CFLAGS = $(AM_CFLAGS)
 usbfluxd_LDFLAGS = $(AM_LDFLAGS) -no-undefined
 usbfluxd_SOURCES = client.c client.h \
+		usbmuxd-proto.h \
+		socket.c socket.h \
 		usbmux_remote.c usbmux_remote.h \
-		device.c device.h \
-		preflight.c preflight.h \
 		log.c log.h \
-		usbmuxd-proto.h usb.c usb.h \
 		utils.c utils.h \
-		conf.c conf.h \
 		main.c

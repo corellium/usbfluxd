@@ -44,14 +44,10 @@
 #include <grp.h>
 
 #include "log.h"
-#include "usb.h"
-#include "device.h"
 #include "client.h"
+#include "socket.h"
+#include "usbmuxd-proto.h"
 #include "usbmux_remote.h"
-#include "conf.h"
-
-static const char *socket_path = "/var/run/usbmuxd";
-static const char *lockfile = "/var/run/usbmuxd.pid";
 
 int should_exit;
 int should_discover;
@@ -65,76 +61,14 @@ static int opt_enable_exit = 0;
 static int opt_exit = 0;
 static int exit_signal = 0;
 static int daemon_pipe;
+static int renamed = 0;
 
 static int report_to_parent = 0;
 
-static int create_socket(void) {
-	struct sockaddr_un bind_addr;
-	int listenfd;
-
-	if(unlink(socket_path) == -1 && errno != ENOENT) {
-		usbmuxd_log(LL_FATAL, "unlink(%s) failed: %s", socket_path, strerror(errno));
-		return -1;
-	}
-
-	listenfd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (listenfd == -1) {
-		usbmuxd_log(LL_FATAL, "socket() failed: %s", strerror(errno));
-		return -1;
-	}
-
-	int flags = fcntl(listenfd, F_GETFL, 0);
-	if (flags < 0) {
-		usbmuxd_log(LL_FATAL, "ERROR: Could not get flags for socket");
-	} else {
-		if (fcntl(listenfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-			usbmuxd_log(LL_FATAL, "ERROR: Could not set socket to non-blocking");
-		}
-	}
-
-	bzero(&bind_addr, sizeof(bind_addr));
-	bind_addr.sun_family = AF_UNIX;
-	strcpy(bind_addr.sun_path, socket_path);
-	if (bind(listenfd, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) != 0) {
-		usbmuxd_log(LL_FATAL, "bind() failed: %s", strerror(errno));
-		return -1;
-	}
-
-	// Start listening
-	if (listen(listenfd, 5) != 0) {
-		usbmuxd_log(LL_FATAL, "listen() failed: %s", strerror(errno));
-		return -1;
-	}
-
-	chmod(socket_path, 0666);
-
-	return listenfd;
-}
-
 static void handle_signal(int sig)
 {
-	if (sig != SIGUSR1 && sig != SIGUSR2) {
-		usbmuxd_log(LL_NOTICE,"Caught signal %d, exiting", sig);
-		should_exit = 1;
-	} else {
-		if(opt_enable_exit) {
-			if (sig == SIGUSR1) {
-				usbmuxd_log(LL_INFO, "Caught SIGUSR1, checking if we can terminate (no more devices attached)...");
-				if (device_get_count(1) > 0) {
-					// we can't quit, there are still devices attached.
-					usbmuxd_log(LL_NOTICE, "Refusing to terminate, there are still devices attached. Kill me with signal 15 (TERM) to force quit.");
-				} else {
-					// it's safe to quit
-					should_exit = 1;
-				}
-			} else if (sig == SIGUSR2) {
-				usbmuxd_log(LL_INFO, "Caught SIGUSR2, scheduling device discovery");
-				should_discover = 1;
-			}
-		} else {
-			usbmuxd_log(LL_INFO, "Caught SIGUSR1/2 but this instance was not started with \"--enable-exit\", ignoring.");
-		}
-	}
+	usbmuxd_log(LL_NOTICE,"Caught signal %d, exiting", sig);
+	should_exit = 1;
 }
 
 static void set_signal_handlers(void)
@@ -177,7 +111,7 @@ static int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout
 
 static int main_loop(int listenfd)
 {
-	int to, cnt, i, dto;
+	int to, cnt, i;
 	struct fdlist pollfds;
 	struct timespec tspec;
 	struct timeval last_check = {0, 0};
@@ -190,17 +124,9 @@ static int main_loop(int listenfd)
 	fdlist_create(&pollfds);
 	while(!should_exit) {
 		usbmuxd_log(LL_FLOOD, "main_loop iteration");
-		to = 500; //usb_get_timeout();
-		/*usbmuxd_log(LL_FLOOD, "USB timeout is %d ms", to);
-		dto = device_get_timeout();
-		usbmuxd_log(LL_FLOOD, "Device timeout is %d ms", dto);
-		if(dto < to)
-			to = dto;
-		*/
-
+		to = 500;
 		fdlist_reset(&pollfds);
 		fdlist_add(&pollfds, FD_LISTEN, listenfd, POLLIN);
-		//usb_get_fds(&pollfds);
 		client_get_fds(&pollfds);
 		usbmux_remote_get_fds(&pollfds);
 		usbmuxd_log(LL_FLOOD, "fd count is %d", pollfds.count);
@@ -215,51 +141,12 @@ static int main_loop(int listenfd)
 					usbmuxd_log(LL_INFO, "Event processing interrupted");
 					break;
 				}
-				/*if(should_discover) {
-					should_discover = 0;
-					usbmuxd_log(LL_INFO, "Device discovery triggered");
-					usb_discover();
-				}*/
 			}
 		} else if(cnt == 0) {
-			/*if(usb_process() < 0) {
-				usbmuxd_log(LL_FATAL, "usb_process() failed");
-				fdlist_free(&pollfds);
-				return -1;
-			}
-			device_check_timeouts();*/
-			
-#if 0
-			if (should_discover) {
-				struct timeval now;
-				get_tick_count(&now);
-				uint64_t now_usec = now.tv_sec * 1000000 + now.tv_usec;
-				uint64_t last_usec = last_check.tv_sec * 1000000 + last_check.tv_usec;
-				if (last_usec == 0) {
-					get_tick_count(&last_check);
-				} else if ((now_usec - last_usec) > 5000000) {
-					// check for remote devices
-					get_tick_count(&last_check);
-
-					/* FIXME: here we need to handle remote devices that were added/removed since last invocation */
-					usbmuxd_log(LL_INFO, "TODO: CHECK FOR REMOTE DEVICES THAT HAVE BEEN ADDED/REMOVED");
-
-					should_discover = 0;
-				}
-			}
-#endif
+			/* do nothing */
 		} else {
-			int done_usb = 0;
 			for(i=0; i<pollfds.count; i++) {
 				if(pollfds.fds[i].revents) {
-					/*if(!done_usb && pollfds.owners[i] == FD_USB) {
-						if(usb_process() < 0) {
-							usbmuxd_log(LL_FATAL, "usb_process() failed");
-							fdlist_free(&pollfds);
-							return -1;
-						}
-						done_usb = 1;
-					}*/
 					if(pollfds.owners[i] == FD_LISTEN) {
 						if(client_accept(listenfd) < 0) {
 							usbmuxd_log(LL_FATAL, "client_accept() failed");
@@ -643,7 +530,7 @@ int main(int argc, char *argv[])
 	setrlimit(RLIMIT_NOFILE, (const struct rlimit*)&rlim);
 
 	usbmuxd_log(LL_INFO, "Creating socket");
-	res = listenfd = create_socket();
+	res = listenfd = socket_create_unix(USBMUXD_SOCKET_FILE);
 	if(listenfd < 0)
 		goto terminate;
 
@@ -732,24 +619,7 @@ int main(int argc, char *argv[])
 
 	client_init();
 	usbmux_remote_init();
-	device_init();
 
-	//usbmuxd_log(LL_INFO, "Initializing USB");
-	//if((res = usb_init()) < 0)
-	//	goto terminate;
-	//
-	//usbmuxd_log(LL_INFO, "%d device%s detected", res, (res==1)?"":"s");
-
-/*	// FIXME: add initial device lookup here
-	struct device_info info;
-	info.id = 0xF0000001;
-	info.location = 0; //usb_get_location(dev->usbdev);
-	info.serial = "fe46f8da35f57262a633fa737bff671f4f7599f8"; // usb_get_serial(dev->usbdev);
-	info.pid = 0x12a8; //usb_get_pid(dev->usbdev);
-	info.speed = 480000000; //usb_get_speed(dev->usbdev);
-
-	device_add(&info, "10.11.1.10", 5000);
-*/
 	usbmuxd_log(LL_NOTICE, "Initialization complete");
 
 #if 0

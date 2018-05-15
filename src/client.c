@@ -43,10 +43,7 @@
 #include <plist/plist.h>
 
 #include "log.h"
-#include "usb.h"
 #include "client.h"
-#include "device.h"
-#include "conf.h"
 
 #include "usbmux_remote.h"
 
@@ -257,7 +254,7 @@ void client_close(struct mux_client *client)
 	if(client->state == CLIENT_CONNECTING1 || client->state == CLIENT_CONNECTING2) {
 		usbmuxd_log(LL_INFO, "Client died mid-connect, aborting device %d connection", client->connect_device);
 		client->state = CLIENT_DEAD;
-		device_abort_connect(client->connect_device, client);
+		//device_abort_connect(client->connect_device, client);
 	}
 	close(client->fd);
 	if (client->remote) {

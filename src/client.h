@@ -25,7 +25,14 @@
 #include "usbmuxd-proto.h"
 #include "usbmux_remote.h"
 
-struct device_info;
+struct device_info {
+        int id;
+        const char *serial;
+        uint32_t location;
+        uint16_t pid;
+        uint64_t speed;
+};
+
 struct mux_client;
 struct remote_mux;
 
