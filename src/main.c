@@ -424,6 +424,11 @@ int main(int argc, char *argv[])
 	/* set log level to specified verbosity */
 	log_level = verbose;
 
+	if (getuid() != 0) {
+		usbmuxd_log(LL_FATAL, "FATAL: usbfluxd needs root privileges. Exiting.");
+		goto terminate;
+	}
+
 	usbmuxd_log(LL_NOTICE, "usbfluxd v%s starting up", PACKAGE_VERSION);
 	should_exit = 0;
 	should_discover = 0;
@@ -431,11 +436,55 @@ int main(int argc, char *argv[])
 	set_signal_handlers();
 	signal(SIGPIPE, SIG_IGN);
 
-/*	if (rename("/var/run/usbmuxd", USBMUXD_RENAMED_SOCKET) != 0) {
-		usbmuxd_log(LL_FATAL, "Could not rename usbmuxd socket file: %s", strerror(errno));
-		goto terminate;
+	/* check if we already have a renamed socket */
+	if (access(USBMUXD_RENAMED_SOCKET, R_OK | W_OK)	== 0) {
+		int testfd = socket_connect_unix(USBMUXD_RENAMED_SOCKET);
+		if (testfd < 0) {
+			usbmuxd_log(LL_INFO, "Renamed socket file '%s' already present but unused. Deleting.", USBMUXD_RENAMED_SOCKET);
+			unlink(USBMUXD_RENAMED_SOCKET);
+		} else {
+			socket_close(testfd);
+			usbmuxd_log(LL_INFO, "Renamed socket file '%s' already present and usable.", USBMUXD_RENAMED_SOCKET);
+			renamed = 1;
+		}
+		if (access(USBMUXD_SOCKET_FILE, R_OK | W_OK) == 0) {
+			testfd = socket_connect_unix(USBMUXD_SOCKET_FILE);
+			if (testfd < 0) {
+				/* connection not possible, this should be OK */
+			} else {
+				socket_close(testfd);
+				usbmuxd_log(LL_FATAL, "Socket file '%s' is already present and seems to be in use. This might be due to another usbfluxd instance running or the original usbmuxd was restarted. Refusing to continue.", USBMUXD_SOCKET_FILE);
+				goto terminate;
+			}
+		}
+	} else {
+		/* renamed socket does not exist, this is what we usually see */
+		/* now check if the original socket is in use */
+		if (access(USBMUXD_SOCKET_FILE, R_OK | W_OK) == 0) {
+			int testfd = socket_connect_unix(USBMUXD_SOCKET_FILE);
+			if (testfd < 0) {
+				usbmuxd_log(LL_FATAL, "Socket file '%s' is present but unused. Original usbmuxd is not running. Exiting.", USBMUXD_SOCKET_FILE);
+				goto terminate;
+			} else {
+				socket_close(testfd);
+				
+			}
+		} else {
+			usbmuxd_log(LL_FATAL, "Socket file '%s' is not present. Original usbmuxd is not running or absent. Exiting.", USBMUXD_SOCKET_FILE);
+			goto terminate;
+		}
 	}
-*/
+
+	if (!renamed) {
+		/* rename the original usbmuxd socket */
+		if (rename(USBMUXD_SOCKET_FILE, USBMUXD_RENAMED_SOCKET) != 0) {
+			usbmuxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file: %s. Exiting.", strerror(errno));
+			goto terminate;
+		}
+		usbmuxd_log(LL_INFO, "Original usbmuxd socket file renamed: %s -> %s", USBMUXD_SOCKET_FILE, USBMUXD_RENAMED_SOCKET);
+		renamed = 1;
+	}
+
 /*	res = lfd = open(lockfile, O_WRONLY|O_CREAT, 0644);
 	if(res == -1) {
 		usbmuxd_log(LL_FATAL, "Could not open lockfile");
@@ -649,6 +698,13 @@ int main(int argc, char *argv[])
 	usbmuxd_log(LL_NOTICE, "Shutdown complete");
 
 terminate:
+	if (renamed) {
+		if (rename(USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE) != 0) {
+			usbmuxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file %s -> %s: %s. You have to fix this manually.", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE, strerror(errno));
+		} else {
+			usbmuxd_log(LL_INFO, "Original usbmuxd socket file restored: %s -> %s", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE);
+		}
+	}
 //	log_disable_syslog();
 
 	if (res < 0)
