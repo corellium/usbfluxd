@@ -1,5 +1,5 @@
 /*
- * usbmux_remote.c
+ * socket.c
  *
  * Copyright (C) 2018 Nikias Bassen <nikias@gmx.li>
  *
