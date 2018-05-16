@@ -120,9 +120,9 @@ pthread_mutex_t client_list_mutex;
  */
 int client_read(struct mux_client *client, void *buffer, uint32_t len)
 {
-	usbmuxd_log(LL_SPEW, "client_read fd %d buf %p len %d", client->fd, buffer, len);
+	usbfluxd_log(LL_SPEW, "client_read fd %d buf %p len %d", client->fd, buffer, len);
 	if(client->state != CLIENT_CONNECTED) {
-		usbmuxd_log(LL_ERROR, "Attempted to read from client %d not in CONNECTED state", client->fd);
+		usbfluxd_log(LL_ERROR, "Attempted to read from client %d not in CONNECTED state", client->fd);
 		return -1;
 	}
 	return recv(client->fd, buffer, len, 0);
@@ -140,18 +140,18 @@ int client_write(struct mux_client *client, void *buffer, uint32_t len)
 {
 	int sret = -1;
 
-	usbmuxd_log(LL_SPEW, "client_write fd %d buf %p len %d", client->fd, buffer, len);
+	usbfluxd_log(LL_SPEW, "client_write fd %d buf %p len %d", client->fd, buffer, len);
 	if(client->state != CLIENT_CONNECTED) {
-		usbmuxd_log(LL_ERROR, "Attempted to write to client %d not in CONNECTED state", client->fd);
+		usbfluxd_log(LL_ERROR, "Attempted to write to client %d not in CONNECTED state", client->fd);
 		return -1;
 	}
 
 	sret = send(client->fd, buffer, len, 0);
 	if (sret < 0) {
 		if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-			usbmuxd_log(LL_ERROR, "ERROR: client_write: fd %d not ready for writing", client->fd);
+			usbfluxd_log(LL_ERROR, "ERROR: client_write: fd %d not ready for writing", client->fd);
 		} else {
-			usbmuxd_log(LL_ERROR, "ERROR: client_write: sending to fd %d failed: %s", client->fd, strerror(errno));
+			usbfluxd_log(LL_ERROR, "ERROR: client_write: sending to fd %d failed: %s", client->fd, strerror(errno));
 		}
 	}
 	return sret;
@@ -170,7 +170,7 @@ int client_write(struct mux_client *client, void *buffer, uint32_t len)
 int client_set_events(struct mux_client *client, short events)
 {
 	if((client->state != CLIENT_CONNECTED) && (client->state != CLIENT_CONNECTING2)) {
-		usbmuxd_log(LL_ERROR, "client_set_events to client %d not in CONNECTED state", client->fd);
+		usbfluxd_log(LL_ERROR, "client_set_events to client %d not in CONNECTED state", client->fd);
 		return -1;
 	}
 	client->devents = events;
@@ -182,7 +182,7 @@ int client_set_events(struct mux_client *client, short events)
 int client_or_events(struct mux_client *client, short events)
 {
 	if((client->state != CLIENT_CONNECTED) && (client->state != CLIENT_CONNECTING2)) {
-		usbmuxd_log(LL_ERROR, "client_or_events to client %d not in CONNECTED state", client->fd);
+		usbfluxd_log(LL_ERROR, "client_or_events to client %d not in CONNECTED state", client->fd);
 		return -1;
 	}
 	client->devents |= events;
@@ -208,7 +208,7 @@ int client_accept(int listenfd)
 	socklen_t len = sizeof(struct sockaddr_un);
 	cfd = accept(listenfd, (struct sockaddr *)&addr, &len);
 	if (cfd < 0) {
-		usbmuxd_log(LL_ERROR, "accept() failed (%s)", strerror(errno));
+		usbfluxd_log(LL_ERROR, "accept() failed (%s)", strerror(errno));
 		return cfd;
 	}
 
@@ -237,22 +237,22 @@ int client_accept(int listenfd)
 		getsockopt(cfd, SOL_SOCKET, SO_PEERCRED, &cr, &len);
 
 		if (getpid() == cr.pid) {
-			usbmuxd_log(LL_INFO, "New client on fd %d (self)", client->fd);
+			usbfluxd_log(LL_INFO, "New client on fd %d (self)", client->fd);
 		} else {
-			usbmuxd_log(LL_INFO, "New client on fd %d (pid %d)", client->fd, cr.pid);
+			usbfluxd_log(LL_INFO, "New client on fd %d (pid %d)", client->fd, cr.pid);
 		}
 	}
 #else
-	usbmuxd_log(LL_INFO, "New client on fd %d", client->fd);
+	usbfluxd_log(LL_INFO, "New client on fd %d", client->fd);
 #endif
 	return client->fd;
 }
 
 void client_close(struct mux_client *client)
 {
-	usbmuxd_log(LL_INFO, "Disconnecting client %p fd %d", client, client->fd);
+	usbfluxd_log(LL_INFO, "Disconnecting client %p fd %d", client, client->fd);
 	if(client->state == CLIENT_CONNECTING1 || client->state == CLIENT_CONNECTING2) {
-		usbmuxd_log(LL_INFO, "Client died mid-connect, aborting device %d connection", client->connect_device);
+		usbfluxd_log(LL_INFO, "Client died mid-connect, aborting device %d connection", client->connect_device);
 		client->state = CLIENT_DEAD;
 		//device_abort_connect(client->connect_device, client);
 	}
@@ -281,17 +281,17 @@ void client_get_fds(struct fdlist *list)
 
 static int send_pkt_raw(struct mux_client *client, void *buffer, unsigned int length)
 {
-	usbmuxd_log(LL_DEBUG, "send_pkt_raw fd %d buffer_length %d", client->fd, length);
+	usbfluxd_log(LL_DEBUG, "send_pkt_raw fd %d buffer_length %d", client->fd, length);
 
 	uint32_t available = client->ob_capacity - client->ob_size;
 	/* the output buffer _should_ be large enough, but just in case */
 	if(available < length) {
 		unsigned char* new_buf;
 		uint32_t new_size = ((client->ob_capacity + length + 4096) / 4096) * 4096;
-		usbmuxd_log(LL_DEBUG, "%s: Enlarging client %d output buffer %d -> %d", __func__, client->fd, client->ob_capacity, new_size);
+		usbfluxd_log(LL_DEBUG, "%s: Enlarging client %d output buffer %d -> %d", __func__, client->fd, client->ob_capacity, new_size);
 		new_buf = realloc(client->ob_buf, new_size);
 		if (!new_buf) {
-			usbmuxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
+			usbfluxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
 			return -1;
 		}
 		client->ob_buf = new_buf;
@@ -311,17 +311,17 @@ static int send_pkt(struct mux_client *client, uint32_t tag, enum usbmuxd_msgtyp
 	hdr.length = sizeof(hdr) + payload_length;
 	hdr.message = msg;
 	hdr.tag = tag;
-	usbmuxd_log(LL_DEBUG, "send_pkt fd %d tag %d msg %d payload_length %d", client->fd, tag, msg, payload_length);
+	usbfluxd_log(LL_DEBUG, "send_pkt fd %d tag %d msg %d payload_length %d", client->fd, tag, msg, payload_length);
 
 	uint32_t available = client->ob_capacity - client->ob_size;
 	/* the output buffer _should_ be large enough, but just in case */
 	if(available < hdr.length) {
 		unsigned char* new_buf;
 		uint32_t new_size = ((client->ob_capacity + hdr.length + 4096) / 4096) * 4096;
-		usbmuxd_log(LL_DEBUG, "%s: Enlarging client %d output buffer %d -> %d", __func__, client->fd, client->ob_capacity, new_size);
+		usbfluxd_log(LL_DEBUG, "%s: Enlarging client %d output buffer %d -> %d", __func__, client->fd, client->ob_capacity, new_size);
 		new_buf = realloc(client->ob_buf, new_size);
 		if (!new_buf) {
-			usbmuxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
+			usbfluxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
 			return -1;
 		}
 		client->ob_buf = new_buf;
@@ -345,7 +345,7 @@ static int send_plist_pkt(struct mux_client *client, uint32_t tag, plist_t plist
 		res = send_pkt(client, tag, MESSAGE_PLIST, xml, xmlsize);
 		free(xml);
 	} else {
-		usbmuxd_log(LL_ERROR, "%s: Could not convert plist to xml", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not convert plist to xml", __func__);
 	}
 	return res;
 }
@@ -379,11 +379,11 @@ void client_set_remote(struct mux_client *client, struct remote_mux *remote)
 
 int client_notify_connect(struct mux_client *client, enum usbmuxd_result result)
 {
-	usbmuxd_log(LL_SPEW, "client_notify_connect fd %d result %d", client->fd, result);
+	usbfluxd_log(LL_SPEW, "client_notify_connect fd %d result %d", client->fd, result);
 	if(client->state == CLIENT_DEAD)
 		return -1;
 	if(client->state != CLIENT_CONNECTING1) {
-		usbmuxd_log(LL_ERROR, "client_notify_connect when client %d is not in CONNECTING1 state", client->fd);
+		usbfluxd_log(LL_ERROR, "client_notify_connect when client %d is not in CONNECTING1 state", client->fd);
 		return -1;
 	}
 	if(send_result(client, client->connect_tag, result) < 0)
@@ -402,7 +402,7 @@ int client_notify_connect(struct mux_client *client, enum usbmuxd_result result)
 
 void client_notify_remote_close(struct mux_client *client)
 {
-	usbmuxd_log(LL_DEBUG, "%s %p", __func__, client);
+	usbfluxd_log(LL_DEBUG, "%s %p", __func__, client);
 	client_close(client);
 }
 
@@ -424,12 +424,12 @@ static int send_device_list(struct mux_client *client, uint32_t tag)
 static int notify_device_add(struct mux_client *client, plist_t dev)
 {
 	int res = -1;
-	usbmuxd_log(LL_DEBUG, "%s: proto version %d", __func__, client->proto_version);
+	usbfluxd_log(LL_DEBUG, "%s: proto version %d", __func__, client->proto_version);
 	if (client->proto_version == 1) {
 		/* XML plist packet */
 		res = send_plist_pkt(client, 0, dev);
 	} else {
-		usbmuxd_log(LL_FATAL, "%s: FATAL: FIXME TODO - need implementation of proto version 0", __func__);
+		usbfluxd_log(LL_FATAL, "%s: FATAL: FIXME TODO - need implementation of proto version 0", __func__);
 		/* binary packet */
 		/*struct usbmuxd_device_record dmsg;
 		memset(&dmsg, 0, sizeof(dmsg));
@@ -463,7 +463,7 @@ static int notify_device_remove(struct mux_client *client, uint32_t device_id)
 static int start_listen(struct mux_client *client)
 {
 	client->state = CLIENT_LISTEN;
-	usbmuxd_log(LL_DEBUG, "Client %d now LISTENING", client->fd);
+	usbfluxd_log(LL_DEBUG, "Client %d now LISTENING", client->fd);
 	plist_t devices = usbmux_remote_get_device_list();	
 	uint32_t i;
 	int count = 0;
@@ -503,10 +503,10 @@ int client_send_packet_data(struct mux_client *client, struct usbmuxd_header *hd
 static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 {
 	int res;
-	usbmuxd_log(LL_DEBUG, "Client command in fd %d len %d ver %d msg %d tag %d", client->fd, hdr->length, hdr->version, hdr->message, hdr->tag);
+	usbfluxd_log(LL_DEBUG, "Client command in fd %d len %d ver %d msg %d tag %d", client->fd, hdr->length, hdr->version, hdr->message, hdr->tag);
 
 	if(client->state != CLIENT_COMMAND) {
-		usbmuxd_log(LL_ERROR, "Client %d command received in the wrong state", client->fd);
+		usbfluxd_log(LL_ERROR, "Client %d command received in the wrong state", client->fd);
 		if(send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
 			return -1;
 		client_close(client);
@@ -514,7 +514,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 	}
 
 	if((hdr->version != 0) && (hdr->version != 1)) {
-		usbmuxd_log(LL_INFO, "Client %d version mismatch: expected 0 or 1, got %d", client->fd, hdr->version);
+		usbfluxd_log(LL_INFO, "Client %d version mismatch: expected 0 or 1, got %d", client->fd, hdr->version);
 		send_result(client, hdr->tag, RESULT_BADVERSION);
 		return 0;
 	}
@@ -531,23 +531,23 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 			plist_t dict = NULL;
 			plist_from_xml(payload, payload_size, &dict);
 			if (!dict) {
-				usbmuxd_log(LL_ERROR, "Could not parse plist from payload!");
+				usbfluxd_log(LL_ERROR, "Could not parse plist from payload!");
 				return -1;
 			} else {
 				char *message = NULL;
 				plist_t node = plist_dict_get_item(dict, "MessageType");
 				if (!node || plist_get_node_type(node) != PLIST_STRING) {
-					usbmuxd_log(LL_ERROR, "Could not read valid MessageType node from plist!");
+					usbfluxd_log(LL_ERROR, "Could not read valid MessageType node from plist!");
 					plist_free(dict);
 					return -1;
 				}
 				plist_get_string_val(node, &message);
 				if (!message) {
-					usbmuxd_log(LL_ERROR, "Could not extract MessageType from plist!");
+					usbfluxd_log(LL_ERROR, "Could not extract MessageType from plist!");
 					plist_free(dict);
 					return -1;
 				}
-				usbmuxd_log(LL_DEBUG, "%s: Message is %s client fd %d", __func__, message, client->fd);
+				usbfluxd_log(LL_DEBUG, "%s: Message is %s client fd %d", __func__, message, client->fd);
 				if (!strcmp(message, "Listen")) {
 					free(message);
 					plist_free(dict);
@@ -562,7 +562,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					// get device id
 					node = plist_dict_get_item(dict, "DeviceID");
 					if (!node) {
-						usbmuxd_log(LL_ERROR, "Received connect request without device_id!");
+						usbfluxd_log(LL_ERROR, "Received connect request without device_id!");
 						plist_free(dict);
 						if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
 							return -1;
@@ -575,7 +575,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					// get port number
 					node = plist_dict_get_item(dict, "PortNumber");
 					if (!node) {
-						usbmuxd_log(LL_ERROR, "Received connect request without port number!");
+						usbfluxd_log(LL_ERROR, "Received connect request without port number!");
 						plist_free(dict);
 						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
 							return -1;
@@ -585,7 +585,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					plist_get_uint_val(node, &val);
 					portnum = (uint16_t)val;
 
-					usbmuxd_log(LL_DEBUG, "Client %d connection request to device %d port %d", client->fd, device_id, ntohs(portnum));
+					usbfluxd_log(LL_DEBUG, "Client %d connection request to device %d port %d", client->fd, device_id, ntohs(portnum));
 
 					res = usbmux_remote_connect(device_id, hdr->tag, dict, client);
 					plist_free(dict);
@@ -635,7 +635,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 						return -1;
 					return 0;
 				} else {
-					usbmuxd_log(LL_ERROR, "Unexpected command '%s' received!", message);
+					usbfluxd_log(LL_ERROR, "Unexpected command '%s' received!", message);
 					free(message);
 					plist_free(dict);
 					if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
@@ -648,11 +648,11 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 		case MESSAGE_LISTEN:
 			if(send_result(client, hdr->tag, 0) < 0)
 				return -1;
-			usbmuxd_log(LL_DEBUG, "Client %d now LISTENING", client->fd);
+			usbfluxd_log(LL_DEBUG, "Client %d now LISTENING", client->fd);
 			return start_listen(client);
 		case MESSAGE_CONNECT:
 			ch = (void*)hdr;
-			usbmuxd_log(LL_DEBUG, "Client %d connection request to device %d port %d", client->fd, ch->device_id, ntohs(ch->port));
+			usbfluxd_log(LL_DEBUG, "Client %d connection request to device %d port %d", client->fd, ch->device_id, ntohs(ch->port));
 			plist_t msg = plist_new_dict();
 			plist_dict_set_item(msg, "MessageType", plist_new_string("Connect"));
 			plist_dict_set_item(msg, "DeviceID", plist_new_uint(ch->device_id));
@@ -669,7 +669,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 			}
 			return 0;
 		default:
-			usbmuxd_log(LL_ERROR, "Client %d invalid command %d", client->fd, hdr->message);
+			usbfluxd_log(LL_ERROR, "Client %d invalid command %d", client->fd, hdr->message);
 			if(send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
 				return -1;
 			return 0;
@@ -679,17 +679,17 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 
 static void process_send(struct mux_client *client)
 {
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 	int res;
 	if (!client->ob_size) {
-		usbmuxd_log(LL_WARNING, "Client %d OUT process but nothing to send?", client->fd);
+		usbfluxd_log(LL_WARNING, "Client %d OUT process but nothing to send?", client->fd);
 		client->events &= ~POLLOUT;
 		return;
 	}
 	res = send(client->fd, client->ob_buf, client->ob_size, 0);
-	usbmuxd_log(LL_DEBUG, "%s: sent %d (of %d)", __func__, res, client->ob_size);
+	usbfluxd_log(LL_DEBUG, "%s: sent %d (of %d)", __func__, res, client->ob_size);
 	if (res <= 0) {
-		usbmuxd_log(LL_ERROR, "Send to client fd %d failed: %d %s", client->fd, res, strerror(errno));
+		usbfluxd_log(LL_ERROR, "Send to client fd %d failed: %d %s", client->fd, res, strerror(errno));
 		client_close(client);
 		return;
 	}
@@ -697,7 +697,7 @@ static void process_send(struct mux_client *client)
 		client->ob_size = 0;
 		client->events &= ~POLLOUT;
 		if (client->state == CLIENT_CONNECTING2) {
-			usbmuxd_log(LL_DEBUG, "Client %d switching to CONNECTED state, remote %d", client->fd, client->remote->fd);
+			usbfluxd_log(LL_DEBUG, "Client %d switching to CONNECTED state, remote %d", client->fd, client->remote->fd);
 			client->state = CLIENT_CONNECTED;
 			client->events = client->devents;
 			// no longer need this
@@ -712,16 +712,16 @@ static void process_send(struct mux_client *client)
 }
 static void process_recv(struct mux_client *client)
 {
-	usbmuxd_log(LL_DEBUG, "%s fd %d", __func__, client->fd);
+	usbfluxd_log(LL_DEBUG, "%s fd %d", __func__, client->fd);
 	int res;
 	int did_read = 0;
 	if(client->ib_size < sizeof(struct usbmuxd_header)) {
 		res = recv(client->fd, client->ib_buf + client->ib_size, sizeof(struct usbmuxd_header) - client->ib_size, 0);
 		if(res <= 0) {
 			if(res < 0)
-				usbmuxd_log(LL_ERROR, "Receive from client fd %d failed: %s", client->fd, strerror(errno));
+				usbfluxd_log(LL_ERROR, "Receive from client fd %d failed: %s", client->fd, strerror(errno));
 			else
-				usbmuxd_log(LL_INFO, "Client %d connection closed", client->fd);
+				usbfluxd_log(LL_INFO, "Client %d connection closed", client->fd);
 			client_close(client);
 			return;
 		}
@@ -732,12 +732,12 @@ static void process_recv(struct mux_client *client)
 	}
 	struct usbmuxd_header *hdr = (void*)client->ib_buf;
 	if(hdr->length > client->ib_capacity) {
-		usbmuxd_log(LL_INFO, "Client %d message is too long (%d bytes)", client->fd, hdr->length);
+		usbfluxd_log(LL_INFO, "Client %d message is too long (%d bytes)", client->fd, hdr->length);
 		client_close(client);
 		return;
 	}
 	if(hdr->length < sizeof(struct usbmuxd_header)) {
-		usbmuxd_log(LL_ERROR, "Client %d message is too short (%d bytes)", client->fd, hdr->length);
+		usbfluxd_log(LL_ERROR, "Client %d message is too short (%d bytes)", client->fd, hdr->length);
 		client_close(client);
 		return;
 	}
@@ -746,11 +746,11 @@ static void process_recv(struct mux_client *client)
 			return; //maybe we would block, so defer to next loop
 		res = recv(client->fd, client->ib_buf + client->ib_size, hdr->length - client->ib_size, 0);
 		if(res < 0) {
-			usbmuxd_log(LL_ERROR, "Receive from client fd %d failed: %s", client->fd, strerror(errno));
+			usbfluxd_log(LL_ERROR, "Receive from client fd %d failed: %s", client->fd, strerror(errno));
 			client_close(client);
 			return;
 		} else if(res == 0) {
-			usbmuxd_log(LL_INFO, "Client %d connection closed", client->fd);
+			usbfluxd_log(LL_INFO, "Client %d connection closed", client->fd);
 			client_close(client);
 			return;
 		}
@@ -775,37 +775,37 @@ void client_process(int fd, short events)
 	pthread_mutex_unlock(&client_list_mutex);
 
 	if(!client) {
-		usbmuxd_log(LL_INFO, "client_process: fd %d not found in client list", fd);
+		usbfluxd_log(LL_INFO, "client_process: fd %d not found in client list", fd);
 		return;
 	}
 
 	if(client->state == CLIENT_CONNECTED) {
-		usbmuxd_log(LL_DEBUG, "%s in CONNECTED state, fd=%d", __func__, fd);
+		usbfluxd_log(LL_DEBUG, "%s in CONNECTED state, fd=%d", __func__, fd);
 		if(events & POLLIN) {
 			// read from client
 			if ((int64_t)client->remote->ob_capacity - (int64_t)client->remote->ob_size <= 0) {
-				usbmuxd_log(LL_WARNING, "%s: ib_buf buffer is full, let's try this next loop iteration", __func__);
+				usbfluxd_log(LL_WARNING, "%s: ib_buf buffer is full, let's try this next loop iteration", __func__);
 				return;
 			}
-			usbmuxd_log(LL_DEBUG, "read from client %d to remote buffer", client->fd);
+			usbfluxd_log(LL_DEBUG, "read from client %d to remote buffer", client->fd);
 			int s = client_read(client, client->remote->ob_buf + client->remote->ob_size, client->remote->ob_capacity - client->remote->ob_size);
-			usbmuxd_log(LL_DEBUG, "client read returned %d", s);
+			usbfluxd_log(LL_DEBUG, "client read returned %d", s);
 			if (s > 0) {
 				client->remote->ob_size += s;
 				client->remote->events |= POLLOUT;
 				client->events &= ~POLLIN;
 			} else {
-				usbmuxd_log(LL_INFO, "Client %d connection closed", client->fd);
+				usbfluxd_log(LL_INFO, "Client %d connection closed", client->fd);
 				client_close(client);
 				return;
 			}
 		} else if (events & POLLOUT) {
-			usbmuxd_log(LL_DEBUG, "writing to client %d from remote buffer", client->fd);
+			usbfluxd_log(LL_DEBUG, "writing to client %d from remote buffer", client->fd);
 			if (client->remote->ib_size > 0) {
-				usbmuxd_log(LL_DEBUG, "sending %d bytes to client", client->remote->ib_size);
+				usbfluxd_log(LL_DEBUG, "sending %d bytes to client", client->remote->ib_size);
 				int res = client_write(client, client->remote->ib_buf, client->remote->ib_size);
 				if(res <= 0) {
-					usbmuxd_log(LL_ERROR, "Send to client fd %d failed: %d %s", client->fd, res, strerror(errno));
+					usbfluxd_log(LL_ERROR, "Send to client fd %d failed: %d %s", client->fd, res, strerror(errno));
 					client_close(client);
 					return;
 				}
@@ -831,7 +831,7 @@ void client_process(int fd, short events)
 void client_device_add(plist_t dev)
 {
 	pthread_mutex_lock(&client_list_mutex);
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 	FOREACH(struct mux_client *client, &client_list) {
 		if (client->state == CLIENT_LISTEN)
 			notify_device_add(client, dev);
@@ -842,7 +842,7 @@ void client_device_add(plist_t dev)
 void client_device_remove(uint32_t device_id)
 {
 	pthread_mutex_lock(&client_list_mutex);
-	usbmuxd_log(LL_DEBUG, "client_device_remove: id %d", device_id);
+	usbfluxd_log(LL_DEBUG, "client_device_remove: id %d", device_id);
 	FOREACH(struct mux_client *client, &client_list) {
 		if (client->state == CLIENT_LISTEN)
 			notify_device_remove(client, device_id);
@@ -852,14 +852,14 @@ void client_device_remove(uint32_t device_id)
 
 void client_init(void)
 {
-	usbmuxd_log(LL_DEBUG, "client_init");
+	usbfluxd_log(LL_DEBUG, "client_init");
 	collection_init(&client_list);
 	pthread_mutex_init(&client_list_mutex, NULL);
 }
 
 void client_shutdown(void)
 {
-	usbmuxd_log(LL_DEBUG, "client_shutdown");
+	usbfluxd_log(LL_DEBUG, "client_shutdown");
 	FOREACH(struct mux_client *client, &client_list) {
 		client_close(client);
 	} ENDFOREACH

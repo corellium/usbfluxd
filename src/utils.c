@@ -38,7 +38,7 @@
 #include "utils.h"
 
 #include "log.h"
-#define util_error(...) usbmuxd_log(LL_ERROR, __VA_ARGS__)
+#define util_error(...) usbfluxd_log(LL_ERROR, __VA_ARGS__)
 
 void fdlist_create(struct fdlist *list)
 {
@@ -244,7 +244,7 @@ int buffer_read_from_filename(const char *filename, char **buffer, uint64_t *len
 
 	int ret = 1;
 	if (fread(*buffer, sizeof(char), size, f) != size) {
-		usbmuxd_log(LL_ERROR, "%s: ERROR: couldn't read %d bytes from %s", __func__, (int)size, filename);
+		usbfluxd_log(LL_ERROR, "%s: ERROR: couldn't read %d bytes from %s", __func__, (int)size, filename);
 		free(buffer);
 		ret = 0;
 		errno = EIO;

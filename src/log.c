@@ -40,7 +40,7 @@ int log_syslog = 0;
 void log_enable_syslog()
 {
 	if (!log_syslog) {
-		openlog("usbmuxd", LOG_PID, 0);
+		openlog("usbfluxd", LOG_PID, 0);
 		log_syslog = 1;
 	}
 }
@@ -61,7 +61,7 @@ static int level_to_syslog_level(int level)
 	return result;
 }
 
-void usbmuxd_log(enum loglevel level, const char *fmt, ...)
+void usbfluxd_log(enum loglevel level, const char *fmt, ...)
 {
 	va_list ap;
 	char *fs;

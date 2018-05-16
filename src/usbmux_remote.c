@@ -77,12 +77,12 @@ static struct remote_mux* remote_mux_new_with_fd(int fd)
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags < 0) {
 		close(fd);
-		usbmuxd_log(LL_ERROR, "ERROR: Could not get socket flags!");
+		usbfluxd_log(LL_ERROR, "ERROR: Could not get socket flags!");
 		return NULL;
 	}
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 		close(fd);
-		usbmuxd_log(LL_ERROR, "ERROR: Could not set socket to non-blocking mode");
+		usbfluxd_log(LL_ERROR, "ERROR: Could not set socket to non-blocking mode");
 		return NULL;
 	}	
 
@@ -100,7 +100,7 @@ static struct remote_mux* remote_mux_new_with_fd(int fd)
 	remote->state = REMOTE_COMMAND;
 	remote->last_command = -1;
 
-	usbmuxd_log(LL_INFO, "New Remote fd %d", fd);
+	usbfluxd_log(LL_INFO, "New Remote fd %d", fd);
 
 	return remote;
 }
@@ -109,7 +109,7 @@ static struct remote_mux* remote_mux_new_with_unix_socket(const char *upath)
 {
 	int fd = socket_connect_unix(upath);
 	if (fd < 0) {
-		usbmuxd_log(LL_ERROR, "ERROR: Failed to connect to unix socket '%s'", upath);
+		usbfluxd_log(LL_ERROR, "ERROR: Failed to connect to unix socket '%s'", upath);
 		return NULL;
 	}
 	struct remote_mux *r = remote_mux_new_with_fd(fd);
@@ -123,7 +123,7 @@ static struct remote_mux* remote_mux_new_with_host(const char *hostname, uint16_
 {
 	int fd = socket_connect(hostname, port);
 	if (fd < 0) {
-		usbmuxd_log(LL_ERROR, "ERROR: Could not connect to %s:%u", hostname, port);
+		usbfluxd_log(LL_ERROR, "ERROR: Could not connect to %s:%u", hostname, port);
 		return NULL;
 	}
 	struct remote_mux *r = remote_mux_new_with_fd(fd);
@@ -150,6 +150,7 @@ static plist_t create_plist_message(const char* message_type)
 	return plist;
 }
 
+
 #if 0
 int usbmux_remote_send_pkt(struct remote_mux *remote, void *buffer, unsigned int length)
 {
@@ -160,7 +161,8 @@ int usbmux_remote_send_pkt(struct remote_mux *remote, void *buffer, unsigned int
 	if(available < length) {
 		unsigned char* new_buf;
 		uint32_t new_size = ((remote->ob_capacity + length + 4096) / 4096) * 4096;
-		usbmuxd_log(LL_DEBUG, "%s: Enlarging remote %d usbmux output buffer %d -> %d", __func__, remote->fd, remote->ob_capacity, new_size);
+		usbmuxd_log(LL_DEBUG, "%s: Enlarging remote %d usbmux output buffer %d -> %d", __func__, remote->fd, remote->ob_capacity, n
+ew_size);
 		new_buf = realloc(remote->ob_buf, new_size);
 		if (!new_buf) {
 			usbmuxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
@@ -183,17 +185,17 @@ static int remote_send_pkt(struct remote_mux *remote, uint32_t tag, enum usbmuxd
 	hdr.length = sizeof(hdr) + payload_length;
 	hdr.message = msg;
 	hdr.tag = tag;
-	usbmuxd_log(LL_DEBUG, "%s fd %d tag %d msg %d payload_length %d", __func__, remote->fd, tag, msg, payload_length);
+	usbfluxd_log(LL_DEBUG, "%s fd %d tag %d msg %d payload_length %d", __func__, remote->fd, tag, msg, payload_length);
 
 	uint32_t available = remote->ob_capacity - remote->ob_size;
 	/* the output buffer _should_ be large enough, but just in case */
 	if (available < hdr.length) {
 		unsigned char* new_buf;
 		uint32_t new_size = ((remote->ob_capacity + hdr.length + 4096) / 4096) * 4096;
-		usbmuxd_log(LL_DEBUG, "%s: Enlarging remote %d output buffer %d -> %d", __func__, remote->fd, remote->ob_capacity, new_size);
+		usbfluxd_log(LL_DEBUG, "%s: Enlarging remote %d output buffer %d -> %d", __func__, remote->fd, remote->ob_capacity, new_size);
 		new_buf = realloc(remote->ob_buf, new_size);
 		if (!new_buf) {
-			usbmuxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
+			usbfluxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
 			return -1;
 		}
 		remote->ob_buf = new_buf;
@@ -217,7 +219,7 @@ static int remote_send_plist_pkt(struct remote_mux *remote, uint32_t tag, plist_
 		res = remote_send_pkt(remote, tag, MESSAGE_PLIST, xml, xmlsize);
 		free(xml);
 	} else {
-		usbmuxd_log(LL_ERROR, "%s: Could not convert plist to xml", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not convert plist to xml", __func__);
 	}
 	return res;
 }
@@ -262,7 +264,7 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 	pthread_mutex_unlock(&remote_list_mutex);
 
 	if (!remote) {
-		usbmuxd_log(LL_ERROR, "%s: Could not find remote mux device for id %d", __func__, device_id);
+		usbfluxd_log(LL_ERROR, "%s: Could not find remote mux device for id %d", __func__, device_id);
 		return -1;
 	}
 
@@ -308,7 +310,7 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
 	pthread_mutex_unlock(&remote_list_mutex);
 
 	if (!remote) {
-		usbmuxd_log(LL_ERROR, "%s: ERROR: Could not determine remote to read BUID from?!", __func__);
+		usbfluxd_log(LL_ERROR, "%s: ERROR: Could not determine remote to read BUID from?!", __func__);
 		return -1;
 	}
 
@@ -350,7 +352,7 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 	plist_dict_foreach(remote_device_list, match_device, &matchctx);
 	if (matchctx.device_id == 0) {
 		// FIXME TODO
-		usbmuxd_log(LL_ERROR, "%s: FIXME: ReadPairRecord request for non-connected device. What now?", __func__);
+		usbfluxd_log(LL_ERROR, "%s: FIXME: ReadPairRecord request for non-connected device. What now?", __func__);
 		pthread_mutex_unlock(&remote_list_mutex);
 		return -1;
 	} else {
@@ -371,7 +373,7 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
 	if (!remote) {
-		usbmuxd_log(LL_ERROR, "%s: ERROR: Could not determine remote for device_id %d?!", __func__, matchctx.device_id);
+		usbfluxd_log(LL_ERROR, "%s: ERROR: Could not determine remote for device_id %d?!", __func__, matchctx.device_id);
 		return -1;
 	}
 
@@ -396,7 +398,7 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 	plist_dict_foreach(remote_device_list, match_device, &matchctx);
 	if (matchctx.device_id == 0) {
 		// FIXME TODO
-		usbmuxd_log(LL_ERROR, "%s: FIXME: SavePairRecord request for non-connected device. What now?", __func__);
+		usbfluxd_log(LL_ERROR, "%s: FIXME: SavePairRecord request for non-connected device. What now?", __func__);
 		pthread_mutex_unlock(&remote_list_mutex);
 		return -1;
 	} else {
@@ -417,7 +419,7 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
 	if (!remote) {
-		usbmuxd_log(LL_ERROR, "%s: ERROR: Could not determine remote for device_id %d?!", __func__, matchctx.device_id);
+		usbfluxd_log(LL_ERROR, "%s: ERROR: Could not determine remote for device_id %d?!", __func__, matchctx.device_id);
 		return -1;
 	}
 
@@ -438,7 +440,7 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 	plist_dict_foreach(remote_device_list, match_device, &matchctx);
 	if (matchctx.device_id == 0) {
 		// FIXME TODO
-		usbmuxd_log(LL_ERROR, "%s: FIXME: DeletePairRecord request for non-connected device. What now?", __func__);
+		usbfluxd_log(LL_ERROR, "%s: FIXME: DeletePairRecord request for non-connected device. What now?", __func__);
 		pthread_mutex_unlock(&remote_list_mutex);
 		return -1;
 	} else {
@@ -459,7 +461,7 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
 	if (!remote) {
-		usbmuxd_log(LL_ERROR, "%s: ERROR: Could not determine remote for device_id %d?!", __func__, matchctx.device_id);
+		usbfluxd_log(LL_ERROR, "%s: ERROR: Could not determine remote for device_id %d?!", __func__, matchctx.device_id);
 		return -1;
 	}
 
@@ -483,12 +485,12 @@ static pthread_t th_mdns_mon;
 
 static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flags, CFTypeRef domainOrService, CFStreamError *error, void *user_data)
 {
-	//usbmuxd_log(LL_INFO, "%s flags = %d, domainOrService: %p\n", __func__, (int)flags, domainOrService);
+	//usbfluxd_log(LL_INFO, "%s flags = %d, domainOrService: %p\n", __func__, (int)flags, domainOrService);
 	if (!domainOrService) {
 		return;
 	}
 	if (error && error->error != 0) {
-		//usbmuxd_log(LL_ERROR, "%s: Error %lx/%x\n", __func__, error->domain, error->error);
+		//usbfluxd_log(LL_ERROR, "%s: Error %lx/%x\n", __func__, error->domain, error->error);
 		return;
 	}
 
@@ -520,7 +522,7 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 				if (remote) {
 					usbmux_remote_dispose(remote);
 				}
-				usbmuxd_log(LL_INFO, "%s: Removed service %s", __func__, service_name);
+				usbfluxd_log(LL_INFO, "%s: Removed service %s", __func__, service_name);
 				pthread_mutex_unlock(&remote_list_mutex);
 				free(service_name);
 			}
@@ -557,7 +559,7 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 					pthread_mutex_lock(&remote_list_mutex);
 					remote->id = remote_id++;
 					remote->service_name = service_name;
-					usbmuxd_log(LL_INFO, "%s: Added service %s", __func__, service_name);
+					usbfluxd_log(LL_INFO, "%s: Added service %s", __func__, service_name);
 					service_name = NULL;
 					collection_add(&remote_list, remote);
 					remote_send_listen_packet(remote);
@@ -578,7 +580,7 @@ void *mdns_monitor_thread(void *user_data)
 
 	CFNetServiceBrowserRef browser = CFNetServiceBrowserCreate(kCFAllocatorDefault, service_browse_cb, &cctx);
 	if (!browser) {
-		usbmuxd_log(LL_ERROR, "Failed to create CFNetServiceBrowser object.");
+		usbfluxd_log(LL_ERROR, "Failed to create CFNetServiceBrowser object.");
 		goto monitor_thread_cleanup;
 	}
 	CFStreamError err;
@@ -601,7 +603,7 @@ monitor_thread_cleanup:
 
 void usbmux_remote_init(void)
 {
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 
 	collection_init(&remote_list);
 	pthread_mutex_init(&remote_list_mutex, NULL);
@@ -621,7 +623,7 @@ void usbmux_remote_init(void)
 
 void usbmux_remote_shutdown(void)
 {
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 
 #ifdef HAVE_CFNETWORK
 	CFStreamError err;
@@ -641,10 +643,10 @@ void usbmux_remote_shutdown(void)
 
 static void remote_close(struct remote_mux *remote)
 {
-	usbmuxd_log(LL_INFO, "%s: Disconnecting remote fd %d", __func__, remote->fd);
+	usbfluxd_log(LL_INFO, "%s: Disconnecting remote fd %d", __func__, remote->fd);
 #if 0
 	if(client->state == CLIENT_CONNECTING1 || client->state == CLIENT_CONNECTING2) {
-		usbmuxd_log(LL_INFO, "Client died mid-connect, aborting device %d connection", client->connect_device);
+		usbfluxd_log(LL_INFO, "Client died mid-connect, aborting device %d connection", client->connect_device);
 		client->state = CLIENT_DEAD;
 		device_abort_connect(client->connect_device, client);
 	}
@@ -661,7 +663,7 @@ static void remote_close(struct remote_mux *remote)
 
 void usbmux_remote_close(struct remote_mux *remote)
 {
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 	struct mux_client *client = remote->client;
 	if (client) {
 		client_notify_remote_close(client);
@@ -685,7 +687,7 @@ static int remote_device_notify_remove(const char* key, const plist_t value, voi
 
 void usbmux_remote_dispose(struct remote_mux *remote)
 {
-	usbmuxd_log(LL_INFO, "%s: Disconnecting remote fd %d", __func__, remote->fd);
+	usbfluxd_log(LL_INFO, "%s: Disconnecting remote fd %d", __func__, remote->fd);
 
 	close(remote->fd);
 
@@ -771,10 +773,10 @@ static uint32_t message_get_result(struct usbmuxd_header *hdr, void *payload, ui
 static int remote_handle_command_result(struct remote_mux *remote, struct usbmuxd_header *hdr)
 {
 	int res = 0;
-	usbmuxd_log(LL_DEBUG, "%s fd %d len %d ver %d msg %d tag %d", __func__, remote->fd, hdr->length, hdr->version, hdr->message, hdr->tag);
+	usbfluxd_log(LL_DEBUG, "%s fd %d len %d ver %d msg %d tag %d", __func__, remote->fd, hdr->length, hdr->version, hdr->message, hdr->tag);
 
 	/*if (remote->state != CLIENT_COMMAND) {
-		usbmuxd_log(LL_ERROR, "Client %d command received in the wrong state", remote->fd);
+		usbfluxd_log(LL_ERROR, "Client %d command received in the wrong state", remote->fd);
 		if(send_result(remote, hdr->tag, RESULT_BADCOMMAND) < 0)
 			return -1;
 		client_close(client);
@@ -782,7 +784,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 	}*/
 
 	if ((hdr->version != 0) && (hdr->version != 1)) {
-		usbmuxd_log(LL_INFO, "remote %d version mismatch: expected 0 or 1, got %d", remote->fd, hdr->version);
+		usbfluxd_log(LL_INFO, "remote %d version mismatch: expected 0 or 1, got %d", remote->fd, hdr->version);
 		//send_result(client, hdr->tag, RESULT_BADVERSION);
 		return 0;
 	}
@@ -801,7 +803,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 			if (result == 0) {
 				remote->state = REMOTE_LISTEN;
 			} else {
-				usbmuxd_log(LL_ERROR, "%s: ERROR: command returned error %u", __func__, result);
+				usbfluxd_log(LL_ERROR, "%s: ERROR: command returned error %u", __func__, result);
 			}
 		} else if (remote->last_command == REMOTE_CMD_READ_BUID) {
 			client_send_packet_data(remote->client, hdr, payload, payload_size);
@@ -809,10 +811,10 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 #if 0 /* DEBUG */
 			plist_t prdata = plist_dict_get_item(plist_msg, "PairRecordData");
 			if (prdata) {
-				usbmuxd_log(LL_DEBUG, "%s: got result for ReadPairRecord command", __func__);
+				usbfluxd_log(LL_DEBUG, "%s: got result for ReadPairRecord command", __func__);
 			} else {
 				uint32_t result = message_get_result(hdr, payload, payload_size, plist_msg);
-				usbmuxd_log(LL_ERROR, "%s: Could not get pair record, error %d", __func__, result);
+				usbfluxd_log(LL_ERROR, "%s: Could not get pair record, error %d", __func__, result);
 			}
 #endif
 			client_send_packet_data(remote->client, hdr, payload, payload_size);
@@ -821,11 +823,11 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		} else if (remote->last_command == REMOTE_CMD_DELETE_PAIR_RECORD) {
 			client_send_packet_data(remote->client, hdr, payload, payload_size);	
 		} else {
-			usbmuxd_log(LL_ERROR, "%s: ERROR: Unexpected message received in command state.", __func__);
+			usbfluxd_log(LL_ERROR, "%s: ERROR: Unexpected message received in command state.", __func__);
 		}
 		remote->last_command = -1;
 	} else if (remote->state == REMOTE_LISTEN) {
-		//usbmuxd_log(LL_INFO, "%s: received in LISTEN state", __func__);
+		//usbfluxd_log(LL_INFO, "%s: received in LISTEN state", __func__);
 		int type = 0;
 		uint32_t devid = 0;
 		if (hdr->message == MESSAGE_DEVICE_ADD) {
@@ -878,10 +880,10 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		}		
 	} else if (remote->state == REMOTE_CONNECTING1) {
 		uint32_t result = message_get_result(hdr, payload, payload_size, plist_msg);
-		usbmuxd_log(LL_DEBUG, "%s: got result %d for Connect request from remote", __func__, result);
+		usbfluxd_log(LL_DEBUG, "%s: got result %d for Connect request from remote", __func__, result);
 		client_notify_connect(remote->client, result);
 		if (result == 0) {
-			usbmuxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
+			usbfluxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
 			remote->state = REMOTE_CONNECTED;//ING2;
 			remote->events = POLLIN | POLLOUT; // wait for the result packet to go through
 		}
@@ -893,18 +895,18 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 
 static void remote_process_send(struct remote_mux *remote)
 {
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 	int res;
 	if(!remote->ob_size) {
-		usbmuxd_log(LL_WARNING, "Remote %d OUT process but nothing to send?", remote->fd);
+		usbfluxd_log(LL_WARNING, "Remote %d OUT process but nothing to send?", remote->fd);
 		remote->events &= ~POLLOUT;
 		return;
 	}
-	usbmuxd_log(LL_DEBUG, "%s: sending %d to usbmuxd (%d)", __func__, remote->ob_size, remote->fd);
+	usbfluxd_log(LL_DEBUG, "%s: sending %d to usbmuxd (%d)", __func__, remote->ob_size, remote->fd);
 	res = send(remote->fd, remote->ob_buf, remote->ob_size, 0);
-	usbmuxd_log(LL_DEBUG, "%s: returned %d", __func__, res);
+	usbfluxd_log(LL_DEBUG, "%s: returned %d", __func__, res);
 	if(res <= 0) {
-		usbmuxd_log(LL_ERROR, "Send to remote fd %d failed: %d %s", remote->fd, res, strerror(errno));
+		usbfluxd_log(LL_ERROR, "Send to remote fd %d failed: %d %s", remote->fd, res, strerror(errno));
 		usbmux_remote_close(remote);
 		return;
 	}
@@ -912,7 +914,7 @@ static void remote_process_send(struct remote_mux *remote)
 		remote->ob_size = 0;
 		remote->events &= ~POLLOUT;
 		if (remote->state == REMOTE_CONNECTING2) {
-			usbmuxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
+			usbfluxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
 			remote->state = REMOTE_CONNECTED;
 			remote->events = remote->devents;
 			remote->events |= POLLIN; //POLLOUT;
@@ -925,16 +927,16 @@ static void remote_process_send(struct remote_mux *remote)
 
 static void remote_process_recv(struct remote_mux *remote)
 {
-	usbmuxd_log(LL_DEBUG, "%s", __func__);
+	usbfluxd_log(LL_DEBUG, "%s", __func__);
 	int res;
 	int did_read = 0;
 	if (remote->ib_size < sizeof(struct usbmuxd_header)) {
 		res = recv(remote->fd, remote->ib_buf + remote->ib_size, sizeof(struct usbmuxd_header) - remote->ib_size, 0);
 		if (res <= 0) {
 			if (res < 0)
-				usbmuxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
+				usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
 			else
-				usbmuxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
+				usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
 			usbmux_remote_dispose(remote);
 			return;
 		}
@@ -945,12 +947,12 @@ static void remote_process_recv(struct remote_mux *remote)
 	}
 	struct usbmuxd_header *hdr = (void*)remote->ib_buf;
 	if (hdr->length > remote->ib_capacity) {
-		usbmuxd_log(LL_INFO, "usbmux %d message is too long (%d bytes)", remote->fd, hdr->length);
+		usbfluxd_log(LL_INFO, "usbmux %d message is too long (%d bytes)", remote->fd, hdr->length);
 		usbmux_remote_dispose(remote);
 		return;
 	}
 	if (hdr->length < sizeof(struct usbmuxd_header)) {
-		usbmuxd_log(LL_ERROR, "usbmux %d message is too short (%d bytes)", remote->fd, hdr->length);
+		usbfluxd_log(LL_ERROR, "usbmux %d message is too short (%d bytes)", remote->fd, hdr->length);
 		usbmux_remote_dispose(remote);
 		return;
 	}
@@ -959,11 +961,11 @@ static void remote_process_recv(struct remote_mux *remote)
 			return; //maybe we would block, so defer to next loop
 		res = recv(remote->fd, remote->ib_buf + remote->ib_size, hdr->length - remote->ib_size, 0);
 		if (res < 0) {
-			usbmuxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
+			usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
 			usbmux_remote_dispose(remote);
 			return;
 		} else if(res == 0) {
-			usbmuxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
+			usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
 			usbmux_remote_dispose(remote);
 			return;
 		}
@@ -989,44 +991,44 @@ void usbmux_remote_process(int fd, short events)
 	pthread_mutex_unlock(&remote_list_mutex);
 
 	if(!remote) {
-		usbmuxd_log(LL_INFO, "%s: fd %d not found in remote mux list", __func__, fd);
+		usbfluxd_log(LL_INFO, "%s: fd %d not found in remote mux list", __func__, fd);
 		return;
 	}
 
 	if (remote->state == REMOTE_CONNECTED) {
-		usbmuxd_log(LL_DEBUG, "%s in CONNECTED state", __func__);
+		usbfluxd_log(LL_DEBUG, "%s in CONNECTED state", __func__);
 		if (events & POLLIN) {
 			// read from remote
 			if (remote->ib_size > 0) {
 				if ((int64_t)remote->ib_capacity - (int64_t)remote->ib_size <= 0) {
-					usbmuxd_log(LL_WARNING, "%s: ib_buf buffer is full, let's try this next loop iteration", __func__);
+					usbfluxd_log(LL_WARNING, "%s: ib_buf buffer is full, let's try this next loop iteration", __func__);
 					return;
 				}
 			}
-			usbmuxd_log(LL_DEBUG, "%s: read from remote (fd %d) to client buffer", __func__, fd);
+			usbfluxd_log(LL_DEBUG, "%s: read from remote (fd %d) to client buffer", __func__, fd);
 			int r = recv(remote->fd, remote->ib_buf + remote->ib_size, remote->ib_capacity - remote->ib_size, 0);
 			if (r < 0) {
 				int e = errno;
-				usbmuxd_log(LL_ERROR, "%s: failed to read from remote (fd %d) errno=%d (%s)", __func__, remote->fd, e, strerror(e));
+				usbfluxd_log(LL_ERROR, "%s: failed to read from remote (fd %d) errno=%d (%s)", __func__, remote->fd, e, strerror(e));
 				usbmux_remote_close(remote);
 				return;
 			} else if (r == 0) {
 				int e = errno;
-				usbmuxd_log(LL_DEBUG, "%s: remote read returned 0, errno=%d", __func__, e);
+				usbfluxd_log(LL_DEBUG, "%s: remote read returned 0, errno=%d", __func__, e);
 				if (e != 0) {
-					usbmuxd_log(LL_ERROR, "%s: recv from remote (fd %d) return 0 errno=%d (%s)", __func__, remote->fd, e, strerror(e));
+					usbfluxd_log(LL_ERROR, "%s: recv from remote (fd %d) return 0 errno=%d (%s)", __func__, remote->fd, e, strerror(e));
 					usbmux_remote_close(remote);
 					return;
 				}
 			} else if (r > 0) {
-				usbmuxd_log(LL_DEBUG, "%s: read %d bytes from remote (fd %d) requested %u", __func__, r, remote->fd, remote->ib_capacity - remote->ib_size);
+				usbfluxd_log(LL_DEBUG, "%s: read %d bytes from remote (fd %d) requested %u", __func__, r, remote->fd, remote->ib_capacity - remote->ib_size);
 				remote->ib_size += r;
 				//client_set_events(remote->client, POLLOUT); //client->events |= POLLOUT;
 				client_or_events(remote->client, POLLOUT);
 			}
 		} else if (events & POLLOUT) {
 			// write to remote
-			usbmuxd_log(LL_DEBUG, "%s: sending %d bytes to remote (fd %d)", __func__, remote->ob_size, fd);
+			usbfluxd_log(LL_DEBUG, "%s: sending %d bytes to remote (fd %d)", __func__, remote->ob_size, fd);
 			remote_process_send(remote);
 			//client_set_events(remote->client, POLLIN); //client->events |= POLLIN;
 			client_or_events(remote->client, POLLIN);
@@ -1034,7 +1036,7 @@ void usbmux_remote_process(int fd, short events)
 	} else {
 		if (events & POLLIN) {
 			if (remote->state == REMOTE_CONNECTING2) {
-				usbmuxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
+				usbfluxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
 				remote->state = REMOTE_CONNECTED;
 				remote->events = remote->devents;
 				remote->events |= POLLIN; //POLLOUT;

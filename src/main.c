@@ -67,7 +67,7 @@ static int report_to_parent = 0;
 
 static void handle_signal(int sig)
 {
-	usbmuxd_log(LL_NOTICE,"Caught signal %d, exiting", sig);
+	usbfluxd_log(LL_NOTICE,"Caught signal %d, exiting", sig);
 	should_exit = 1;
 }
 
@@ -123,22 +123,22 @@ static int main_loop(int listenfd)
 
 	fdlist_create(&pollfds);
 	while(!should_exit) {
-		usbmuxd_log(LL_FLOOD, "main_loop iteration");
+		usbfluxd_log(LL_FLOOD, "main_loop iteration");
 		to = 500;
 		fdlist_reset(&pollfds);
 		fdlist_add(&pollfds, FD_LISTEN, listenfd, POLLIN);
 		client_get_fds(&pollfds);
 		usbmux_remote_get_fds(&pollfds);
-		usbmuxd_log(LL_FLOOD, "fd count is %d", pollfds.count);
+		usbfluxd_log(LL_FLOOD, "fd count is %d", pollfds.count);
 
 		tspec.tv_sec = to / 1000;
 		tspec.tv_nsec = (to % 1000) * 1000000;
 		cnt = ppoll(pollfds.fds, pollfds.count, &tspec, &empty_sigset);
-		usbmuxd_log(LL_FLOOD, "poll() returned %d", cnt);
+		usbfluxd_log(LL_FLOOD, "poll() returned %d", cnt);
 		if(cnt == -1) {
 			if(errno == EINTR) {
 				if(should_exit) {
-					usbmuxd_log(LL_INFO, "Event processing interrupted");
+					usbfluxd_log(LL_INFO, "Event processing interrupted");
 					break;
 				}
 			}
@@ -149,7 +149,7 @@ static int main_loop(int listenfd)
 				if(pollfds.fds[i].revents) {
 					if(pollfds.owners[i] == FD_LISTEN) {
 						if(client_accept(listenfd) < 0) {
-							usbmuxd_log(LL_FATAL, "client_accept() failed");
+							usbfluxd_log(LL_FATAL, "client_accept() failed");
 							fdlist_free(&pollfds);
 							return -1;
 						}
@@ -183,13 +183,13 @@ static int daemonize(void)
 		return 0;
 
 	if((res = pipe(pfd)) < 0) {
-		usbmuxd_log(LL_FATAL, "pipe() failed.");
+		usbfluxd_log(LL_FATAL, "pipe() failed.");
 		return res;
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		usbmuxd_log(LL_FATAL, "fork() failed.");
+		usbfluxd_log(LL_FATAL, "fork() failed.");
 		return pid;
 	}
 
@@ -216,13 +216,13 @@ static int daemonize(void)
 	// Create a new SID for the child process
 	sid = setsid();
 	if (sid < 0) {
-		usbmuxd_log(LL_FATAL, "setsid() failed.");
+		usbfluxd_log(LL_FATAL, "setsid() failed.");
 		return -1;
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		usbmuxd_log(LL_FATAL, "fork() failed (second).");
+		usbfluxd_log(LL_FATAL, "fork() failed (second).");
 		return pid;
 	}
 
@@ -234,16 +234,16 @@ static int daemonize(void)
 
 	// Change the current working directory.
 	if ((chdir("/")) < 0) {
-		usbmuxd_log(LL_FATAL, "chdir() failed");
+		usbfluxd_log(LL_FATAL, "chdir() failed");
 		return -2;
 	}
 	// Redirect standard files to /dev/null
 	if (!freopen("/dev/null", "r", stdin)) {
-		usbmuxd_log(LL_FATAL, "Redirection of stdin failed.");
+		usbfluxd_log(LL_FATAL, "Redirection of stdin failed.");
 		return -3;
 	}
 	if (!freopen("/dev/null", "w", stdout)) {
-		usbmuxd_log(LL_FATAL, "Redirection of stdout failed.");
+		usbfluxd_log(LL_FATAL, "Redirection of stdout failed.");
 		return -3;
 	}
 
@@ -256,7 +256,7 @@ static int notify_parent(int status)
 
 	report_to_parent = 0;
 	if ((res = write(daemon_pipe, &status, sizeof(int))) != sizeof(int)) {
-		usbmuxd_log(LL_FATAL, "Could not notify parent!");
+		usbfluxd_log(LL_FATAL, "Could not notify parent!");
 		if(res >= 0)
 			return -2;
 		else
@@ -264,7 +264,7 @@ static int notify_parent(int status)
 	}
 	close(daemon_pipe);
 	if (!freopen("/dev/null", "w", stderr)) {
-		usbmuxd_log(LL_FATAL, "Redirection of stderr failed.");
+		usbfluxd_log(LL_FATAL, "Redirection of stderr failed.");
 		return -1;
 	}
 	return 0;
@@ -425,11 +425,11 @@ int main(int argc, char *argv[])
 	log_level = verbose;
 
 	if (getuid() != 0) {
-		usbmuxd_log(LL_FATAL, "FATAL: usbfluxd needs root privileges. Exiting.");
+		usbfluxd_log(LL_FATAL, "FATAL: usbfluxd needs root privileges. Exiting.");
 		goto terminate;
 	}
 
-	usbmuxd_log(LL_NOTICE, "usbfluxd v%s starting up", PACKAGE_VERSION);
+	usbfluxd_log(LL_NOTICE, "usbfluxd v%s starting up", PACKAGE_VERSION);
 	should_exit = 0;
 	should_discover = 0;
 
@@ -440,11 +440,11 @@ int main(int argc, char *argv[])
 	if (access(USBMUXD_RENAMED_SOCKET, R_OK | W_OK)	== 0) {
 		int testfd = socket_connect_unix(USBMUXD_RENAMED_SOCKET);
 		if (testfd < 0) {
-			usbmuxd_log(LL_INFO, "Renamed socket file '%s' already present but unused. Deleting.", USBMUXD_RENAMED_SOCKET);
+			usbfluxd_log(LL_INFO, "Renamed socket file '%s' already present but unused. Deleting.", USBMUXD_RENAMED_SOCKET);
 			unlink(USBMUXD_RENAMED_SOCKET);
 		} else {
 			socket_close(testfd);
-			usbmuxd_log(LL_INFO, "Renamed socket file '%s' already present and usable.", USBMUXD_RENAMED_SOCKET);
+			usbfluxd_log(LL_INFO, "Renamed socket file '%s' already present and usable.", USBMUXD_RENAMED_SOCKET);
 			renamed = 1;
 		}
 		if (access(USBMUXD_SOCKET_FILE, R_OK | W_OK) == 0) {
@@ -453,7 +453,7 @@ int main(int argc, char *argv[])
 				/* connection not possible, this should be OK */
 			} else {
 				socket_close(testfd);
-				usbmuxd_log(LL_FATAL, "Socket file '%s' is already present and seems to be in use. This might be due to another usbfluxd instance running or the original usbmuxd was restarted. Refusing to continue.", USBMUXD_SOCKET_FILE);
+				usbfluxd_log(LL_FATAL, "Socket file '%s' is already present and seems to be in use. This might be due to another usbfluxd instance running or the original usbmuxd was restarted. Refusing to continue.", USBMUXD_SOCKET_FILE);
 				goto terminate;
 			}
 		}
@@ -463,14 +463,14 @@ int main(int argc, char *argv[])
 		if (access(USBMUXD_SOCKET_FILE, R_OK | W_OK) == 0) {
 			int testfd = socket_connect_unix(USBMUXD_SOCKET_FILE);
 			if (testfd < 0) {
-				usbmuxd_log(LL_FATAL, "Socket file '%s' is present but unused. Original usbmuxd is not running. Exiting.", USBMUXD_SOCKET_FILE);
+				usbfluxd_log(LL_FATAL, "Socket file '%s' is present but unused. Original usbmuxd is not running. Exiting.", USBMUXD_SOCKET_FILE);
 				goto terminate;
 			} else {
 				socket_close(testfd);
 				
 			}
 		} else {
-			usbmuxd_log(LL_FATAL, "Socket file '%s' is not present. Original usbmuxd is not running or absent. Exiting.", USBMUXD_SOCKET_FILE);
+			usbfluxd_log(LL_FATAL, "Socket file '%s' is not present. Original usbmuxd is not running or absent. Exiting.", USBMUXD_SOCKET_FILE);
 			goto terminate;
 		}
 	}
@@ -478,16 +478,16 @@ int main(int argc, char *argv[])
 	if (!renamed) {
 		/* rename the original usbmuxd socket */
 		if (rename(USBMUXD_SOCKET_FILE, USBMUXD_RENAMED_SOCKET) != 0) {
-			usbmuxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file: %s. Exiting.", strerror(errno));
+			usbfluxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file: %s. Exiting.", strerror(errno));
 			goto terminate;
 		}
-		usbmuxd_log(LL_INFO, "Original usbmuxd socket file renamed: %s -> %s", USBMUXD_SOCKET_FILE, USBMUXD_RENAMED_SOCKET);
+		usbfluxd_log(LL_INFO, "Original usbmuxd socket file renamed: %s -> %s", USBMUXD_SOCKET_FILE, USBMUXD_RENAMED_SOCKET);
 		renamed = 1;
 	}
 
 /*	res = lfd = open(lockfile, O_WRONLY|O_CREAT, 0644);
 	if(res == -1) {
-		usbmuxd_log(LL_FATAL, "Could not open lockfile");
+		usbfluxd_log(LL_FATAL, "Could not open lockfile");
 		goto terminate;
 	}
 	lock.l_type = F_WRLCK;
@@ -500,33 +500,33 @@ int main(int argc, char *argv[])
 	if (lock.l_type != F_UNLCK) {
 		if (opt_exit) {
 			if (lock.l_pid && !kill(lock.l_pid, 0)) {
-				usbmuxd_log(LL_NOTICE, "Sending signal %d to instance with pid %d", exit_signal, lock.l_pid);
+				usbfluxd_log(LL_NOTICE, "Sending signal %d to instance with pid %d", exit_signal, lock.l_pid);
 				res = 0;
 				if (kill(lock.l_pid, exit_signal) < 0) {
-					usbmuxd_log(LL_FATAL, "Could not deliver signal %d to pid %d", exit_signal, lock.l_pid);
+					usbfluxd_log(LL_FATAL, "Could not deliver signal %d to pid %d", exit_signal, lock.l_pid);
 					res = -1;
 				}
 				goto terminate;
 			} else {
-				usbmuxd_log(LL_ERROR, "Could not determine pid of the other running instance!");
+				usbfluxd_log(LL_ERROR, "Could not determine pid of the other running instance!");
 				res = -1;
 				goto terminate;
 			}
 		} else {
 			if (!opt_disable_hotplug) {
-				usbmuxd_log(LL_ERROR, "Another instance is already running (pid %d). exiting.", lock.l_pid);
+				usbfluxd_log(LL_ERROR, "Another instance is already running (pid %d). exiting.", lock.l_pid);
 				res = -1;
 			} else {
-				usbmuxd_log(LL_NOTICE, "Another instance is already running (pid %d). Telling it to check for devices.", lock.l_pid);
+				usbfluxd_log(LL_NOTICE, "Another instance is already running (pid %d). Telling it to check for devices.", lock.l_pid);
 				if (lock.l_pid && !kill(lock.l_pid, 0)) {
-					usbmuxd_log(LL_NOTICE, "Sending signal SIGUSR2 to instance with pid %d", lock.l_pid);
+					usbfluxd_log(LL_NOTICE, "Sending signal SIGUSR2 to instance with pid %d", lock.l_pid);
 					res = 0;
 					if (kill(lock.l_pid, SIGUSR2) < 0) {
-						usbmuxd_log(LL_FATAL, "Could not deliver SIGUSR2 to pid %d", lock.l_pid);
+						usbfluxd_log(LL_FATAL, "Could not deliver SIGUSR2 to pid %d", lock.l_pid);
 						res = -1;
 					}
 				} else {
-					usbmuxd_log(LL_ERROR, "Could not determine pid of the other running instance!");
+					usbfluxd_log(LL_ERROR, "Could not determine pid of the other running instance!");
 					res = -1;
 				}
 			}
@@ -536,14 +536,14 @@ int main(int argc, char *argv[])
 	unlink(lockfile);
 
 	if (opt_exit) {
-		usbmuxd_log(LL_NOTICE, "No running instance found, none killed. Exiting.");
+		usbfluxd_log(LL_NOTICE, "No running instance found, none killed. Exiting.");
 		goto terminate;
 	}
 
 	if (!foreground) {
 		if ((res = daemonize()) < 0) {
 			fprintf(stderr, "usbmuxd: FATAL: Could not daemonize!\n");
-			usbmuxd_log(LL_FATAL, "Could not daemonize!");
+			usbfluxd_log(LL_FATAL, "Could not daemonize!");
 			goto terminate;
 		}
 	}
@@ -552,7 +552,7 @@ int main(int argc, char *argv[])
 /*	// now open the lockfile and place the lock
 	res = lfd = open(lockfile, O_WRONLY|O_CREAT|O_TRUNC|O_EXCL, 0644);
 	if(res < 0) {
-		usbmuxd_log(LL_FATAL, "Could not open lockfile");
+		usbfluxd_log(LL_FATAL, "Could not open lockfile");
 		goto terminate;
 	}
 	lock.l_type = F_WRLCK;
@@ -560,12 +560,12 @@ int main(int argc, char *argv[])
 	lock.l_start = 0;
 	lock.l_len = 0;
 	if ((res = fcntl(lfd, F_SETLK, &lock)) < 0) {
-		usbmuxd_log(LL_FATAL, "Lockfile locking failed!");
+		usbfluxd_log(LL_FATAL, "Lockfile locking failed!");
 		goto terminate;
 	}
 	sprintf(pids, "%d", getpid());
 	if ((size_t)(res = write(lfd, pids, strlen(pids))) != strlen(pids)) {
-		usbmuxd_log(LL_FATAL, "Could not write pidfile!");
+		usbfluxd_log(LL_FATAL, "Could not write pidfile!");
 		if(res >= 0)
 			res = -2;
 		goto terminate;
@@ -578,7 +578,7 @@ int main(int argc, char *argv[])
 	rlim.rlim_max = 65536;
 	setrlimit(RLIMIT_NOFILE, (const struct rlimit*)&rlim);
 
-	usbmuxd_log(LL_INFO, "Creating socket");
+	usbfluxd_log(LL_INFO, "Creating socket");
 	res = listenfd = socket_create_unix(USBMUXD_SOCKET_FILE);
 	if(listenfd < 0)
 		goto terminate;
@@ -590,12 +590,12 @@ int main(int argc, char *argv[])
 	memset(&fst, '\0', sizeof(struct stat));
 	if (stat(userprefdir, &fst) < 0) {
 		if (mkdir(userprefdir, 0775) < 0) {
-			usbmuxd_log(LL_FATAL, "Failed to create required directory '%s': %s", userprefdir, strerror(errno));
+			usbfluxd_log(LL_FATAL, "Failed to create required directory '%s': %s", userprefdir, strerror(errno));
 			res = -1;
 			goto terminate;
 		}
 		if (stat(userprefdir, &fst) < 0) {
-			usbmuxd_log(LL_FATAL, "stat() failed after creating directory '%s': %s", userprefdir, strerror(errno));
+			usbfluxd_log(LL_FATAL, "stat() failed after creating directory '%s': %s", userprefdir, strerror(errno));
 			res = -1;
 			goto terminate;
 		}
@@ -604,7 +604,7 @@ int main(int argc, char *argv[])
 	// make sure permission bits are set correctly
 	if (fst.st_mode != 02775) {
 		if (chmod(userprefdir, 02775) < 0) {
-			usbmuxd_log(LL_WARNING, "chmod(%s, 02775) failed: %s", userprefdir, strerror(errno));
+			usbfluxd_log(LL_WARNING, "chmod(%s, 02775) failed: %s", userprefdir, strerror(errno));
 		}
 	}
 #endif
@@ -615,53 +615,53 @@ int main(int argc, char *argv[])
 	if (drop_privileges && (getuid() == 0 || geteuid() == 0)) {
 		struct passwd *pw;
 		if (!drop_user) {
-			usbmuxd_log(LL_FATAL, "No user to drop privileges to?");
+			usbfluxd_log(LL_FATAL, "No user to drop privileges to?");
 			res = -1;
 			goto terminate;
 		}
 		pw = getpwnam(drop_user);
 		if (!pw) {
-			usbmuxd_log(LL_FATAL, "Dropping privileges failed, check if user '%s' exists!", drop_user);
+			usbfluxd_log(LL_FATAL, "Dropping privileges failed, check if user '%s' exists!", drop_user);
 			res = -1;
 			goto terminate;
 		}
 		if (pw->pw_uid == 0) {
-			usbmuxd_log(LL_INFO, "Not dropping privileges to root");
+			usbfluxd_log(LL_INFO, "Not dropping privileges to root");
 		} else {
 #ifdef HAVE_LIBIMOBILEDEVICE
 			/* make sure the non-privileged user has proper access to the config directory */
 			if ((fst.st_uid != pw->pw_uid) || (fst.st_gid != pw->pw_gid)) {
 				if (chown(userprefdir, pw->pw_uid, pw->pw_gid) < 0) {
-					usbmuxd_log(LL_WARNING, "chown(%s, %d, %d) failed: %s", userprefdir, pw->pw_uid, pw->pw_gid, strerror(errno));
+					usbfluxd_log(LL_WARNING, "chown(%s, %d, %d) failed: %s", userprefdir, pw->pw_uid, pw->pw_gid, strerror(errno));
 				}
 			}
 #endif
 
 			if ((res = initgroups(drop_user, pw->pw_gid)) < 0) {
-				usbmuxd_log(LL_FATAL, "Failed to drop privileges (cannot set supplementary groups)");
+				usbfluxd_log(LL_FATAL, "Failed to drop privileges (cannot set supplementary groups)");
 				goto terminate;
 			}
 			if ((res = setgid(pw->pw_gid)) < 0) {
-				usbmuxd_log(LL_FATAL, "Failed to drop privileges (cannot set group ID to %d)", pw->pw_gid);
+				usbfluxd_log(LL_FATAL, "Failed to drop privileges (cannot set group ID to %d)", pw->pw_gid);
 				goto terminate;
 			}
 			if ((res = setuid(pw->pw_uid)) < 0) {
-				usbmuxd_log(LL_FATAL, "Failed to drop privileges (cannot set user ID to %d)", pw->pw_uid);
+				usbfluxd_log(LL_FATAL, "Failed to drop privileges (cannot set user ID to %d)", pw->pw_uid);
 				goto terminate;
 			}
 
 			// security check
 			if (setuid(0) != -1) {
-				usbmuxd_log(LL_FATAL, "Failed to drop privileges properly!");
+				usbfluxd_log(LL_FATAL, "Failed to drop privileges properly!");
 				res = -1;
 				goto terminate;
 			}
 			if (getuid() != pw->pw_uid || getgid() != pw->pw_gid) {
-				usbmuxd_log(LL_FATAL, "Failed to drop privileges properly!");
+				usbfluxd_log(LL_FATAL, "Failed to drop privileges properly!");
 				res = -1;
 				goto terminate;
 			}
-			usbmuxd_log(LL_NOTICE, "Successfully dropped privileges to '%s'", drop_user);
+			usbfluxd_log(LL_NOTICE, "Successfully dropped privileges to '%s'", drop_user);
 		}
 	}
 #endif
@@ -669,7 +669,7 @@ int main(int argc, char *argv[])
 	client_init();
 	usbmux_remote_init();
 
-	usbmuxd_log(LL_NOTICE, "Initialization complete");
+	usbfluxd_log(LL_NOTICE, "Initialization complete");
 
 #if 0
 	if (report_to_parent)
@@ -677,32 +677,32 @@ int main(int argc, char *argv[])
 			goto terminate;
 
 	if(opt_disable_hotplug) {
-		usbmuxd_log(LL_NOTICE, "Automatic device discovery on hotplug disabled.");
+		usbfluxd_log(LL_NOTICE, "Automatic device discovery on hotplug disabled.");
 		usb_autodiscover(0); // discovery to be triggered by new instance
 	}
 	if (opt_enable_exit) {
-		usbmuxd_log(LL_NOTICE, "Enabled exit on SIGUSR1 if no devices are attached. Start a new instance with \"--exit\" to trigger.");
+		usbfluxd_log(LL_NOTICE, "Enabled exit on SIGUSR1 if no devices are attached. Start a new instance with \"--exit\" to trigger.");
 	}
 #endif
 
 	res = main_loop(listenfd);
 	if(res < 0)
-		usbmuxd_log(LL_FATAL, "main_loop failed");
+		usbfluxd_log(LL_FATAL, "main_loop failed");
 
-	usbmuxd_log(LL_NOTICE, "usbmuxd shutting down");
+	usbfluxd_log(LL_NOTICE, "usbfluxd shutting down");
 //	device_kill_connections();
 //	usb_shutdown();
 //	device_shutdown();
 	client_shutdown();
 	usbmux_remote_shutdown();
-	usbmuxd_log(LL_NOTICE, "Shutdown complete");
+	usbfluxd_log(LL_NOTICE, "Shutdown complete");
 
 terminate:
 	if (renamed) {
 		if (rename(USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE) != 0) {
-			usbmuxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file %s -> %s: %s. You have to fix this manually.", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE, strerror(errno));
+			usbfluxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file %s -> %s: %s. You have to fix this manually.", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE, strerror(errno));
 		} else {
-			usbmuxd_log(LL_INFO, "Original usbmuxd socket file restored: %s -> %s", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE);
+			usbfluxd_log(LL_INFO, "Original usbmuxd socket file restored: %s -> %s", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE);
 		}
 	}
 //	log_disable_syslog();

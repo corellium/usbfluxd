@@ -55,31 +55,31 @@ int socket_connect_unix(const char *filename)
 
 	// check if socket file exists...
 	if (stat(filename, &fst) != 0) {
-		usbmuxd_log(LL_ERROR, "%s: stat '%s': %s", __func__, filename, strerror(errno));
+		usbfluxd_log(LL_ERROR, "%s: stat '%s': %s", __func__, filename, strerror(errno));
 		return -1;
 	}
 	// ... and if it is a unix domain socket
 	if (!S_ISSOCK(fst.st_mode)) {
-		usbmuxd_log(LL_ERROR, "%s: File '%s' is not a socket!", __func__, filename);
+		usbfluxd_log(LL_ERROR, "%s: File '%s' is not a socket!", __func__, filename);
 		return -1;
 	}
 	// make a new socket
 	if ((sfd = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0) {
-		usbmuxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
+		usbfluxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
 		return -1;
 	}
 
 	if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: Could not set send buffer size", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not set send buffer size", __func__);
 	}
 
 	if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: Could not set receive buffer size", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not set receive buffer size", __func__);
 	}
 
 #ifdef SO_NOSIGPIPE
 	if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "setsockopt(): %s", strerror(errno));
+		usbfluxd_log(LL_ERROR, "setsockopt(): %s", strerror(errno));
 		socket_close(sfd);
 		return -1;
 	}
@@ -95,7 +95,7 @@ int socket_connect_unix(const char *filename)
 
 	if (connect(sfd, (struct sockaddr *) &name, size) < 0) {
 		socket_close(sfd);
-		usbmuxd_log(LL_DEBUG, "%s: connect: %s", __func__, strerror(errno));
+		usbfluxd_log(LL_DEBUG, "%s: connect: %s", __func__, strerror(errno));
 		return -1;
 	}
 
@@ -116,44 +116,44 @@ int socket_connect(const char *addr, uint16_t port)
 	}
 
 	if ((hp = gethostbyname(addr)) == NULL) {
-		usbmuxd_log(LL_ERROR, "%s: unknown host '%s'", __func__, addr);
+		usbfluxd_log(LL_ERROR, "%s: unknown host '%s'", __func__, addr);
 		return -1;
 	}
 
 	if (!hp->h_addr) {
-		usbmuxd_log(LL_ERROR, "%s: gethostbyname returned NULL address!", __func__);
+		usbfluxd_log(LL_ERROR, "%s: gethostbyname returned NULL address!", __func__);
 		return -1;
 	}
 
 	if (0 > (sfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP))) {
-		usbmuxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
+		usbfluxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
 		return -1;
 	}
 
 	if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
+		usbfluxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
 		socket_close(sfd);
 		return -1;
 	}
 
 #ifdef SO_NOSIGPIPE
 	if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
+		usbfluxd_log(LL_ERROR, "%s: setsockopt: %s", __func__, strerror(errno));
 		socket_close(sfd);
 		return -1;
 	}
 #endif
 
 	if (setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (void*)&yes, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: Could not set TCP_NODELAY on socket", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not set TCP_NODELAY on socket", __func__);
 	}
 
 	if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: Could not set send buffer size", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not set send buffer size", __func__);
 	}
 
 	if (setsockopt(sfd, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(int)) == -1) {
-		usbmuxd_log(LL_ERROR, "%s: Could not set receive buffer size", __func__);
+		usbfluxd_log(LL_ERROR, "%s: Could not set receive buffer size", __func__);
 	}
 
 	memset((void *) &saddr, 0, sizeof(saddr));
@@ -162,7 +162,7 @@ int socket_connect(const char *addr, uint16_t port)
 	saddr.sin_port = htons(port);
 
 	if (connect(sfd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0) {
-		usbmuxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
+		usbfluxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
 		socket_close(sfd);
 		return -2;
 	}
@@ -176,22 +176,22 @@ int socket_create_unix(const char *socket_path)
 	int listenfd;
 
 	if (unlink(socket_path) == -1 && errno != ENOENT) {
-		usbmuxd_log(LL_FATAL, "unlink(%s) failed: %s", socket_path, strerror(errno));
+		usbfluxd_log(LL_FATAL, "unlink(%s) failed: %s", socket_path, strerror(errno));
 		return -1;
 	}
 
 	listenfd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (listenfd == -1) {
-		usbmuxd_log(LL_FATAL, "socket() failed: %s", strerror(errno));
+		usbfluxd_log(LL_FATAL, "socket() failed: %s", strerror(errno));
 		return -1;
 	}
 
 	int flags = fcntl(listenfd, F_GETFL, 0);
 	if (flags < 0) {
-		usbmuxd_log(LL_FATAL, "ERROR: Could not get flags for socket");
+		usbfluxd_log(LL_FATAL, "ERROR: Could not get flags for socket");
 	} else {
 		if (fcntl(listenfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-			usbmuxd_log(LL_FATAL, "ERROR: Could not set socket to non-blocking");
+			usbfluxd_log(LL_FATAL, "ERROR: Could not set socket to non-blocking");
 		}
 	}
 
@@ -199,13 +199,13 @@ int socket_create_unix(const char *socket_path)
 	bind_addr.sun_family = AF_UNIX;
 	strcpy(bind_addr.sun_path, socket_path);
 	if (bind(listenfd, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) != 0) {
-		usbmuxd_log(LL_FATAL, "bind() failed: %s", strerror(errno));
+		usbfluxd_log(LL_FATAL, "bind() failed: %s", strerror(errno));
 		return -1;
 	}
 
 	// Start listening
 	if (listen(listenfd, 5) != 0) {
-		usbmuxd_log(LL_FATAL, "listen() failed: %s", strerror(errno));
+		usbfluxd_log(LL_FATAL, "listen() failed: %s", strerror(errno));
 		return -1;
 	}
 
