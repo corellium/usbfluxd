@@ -95,7 +95,7 @@ int socket_connect_unix(const char *filename)
 
 	if (connect(sfd, (struct sockaddr *) &name, size) < 0) {
 		socket_close(sfd);
-		usbmuxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
+		usbmuxd_log(LL_DEBUG, "%s: connect: %s", __func__, strerror(errno));
 		return -1;
 	}
 
