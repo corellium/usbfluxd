@@ -484,6 +484,9 @@ static pthread_t th_mdns_mon;
 static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flags, CFTypeRef domainOrService, CFStreamError *error, void *user_data)
 {
 	//usbmuxd_log(LL_INFO, "%s flags = %d, domainOrService: %p\n", __func__, (int)flags, domainOrService);
+	if (!domainOrService) {
+		return;
+	}
 	if (error && error->error != 0) {
 		//usbmuxd_log(LL_ERROR, "%s: Error %lx/%x\n", __func__, error->domain, error->error);
 		return;
