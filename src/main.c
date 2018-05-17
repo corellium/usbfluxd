@@ -344,7 +344,7 @@ int main(int argc, char *argv[])
 
 	if (!foreground) {
 		verbose += LL_WARNING;
-		//log_enable_syslog();
+		log_enable_syslog();
 	} else {
 		verbose += LL_NOTICE;
 	}
@@ -413,7 +413,6 @@ int main(int argc, char *argv[])
 		renamed = 1;
 	}
 
-/*
 	if (!foreground) {
 		if ((res = daemonize()) < 0) {
 			fprintf(stderr, "usbmuxd: FATAL: Could not daemonize!\n");
@@ -421,7 +420,6 @@ int main(int argc, char *argv[])
 			goto terminate;
 		}
 	}
-*/
 
 	// set number of file descriptors to higher value
 	struct rlimit rlim;
@@ -439,11 +437,9 @@ int main(int argc, char *argv[])
 
 	usbfluxd_log(LL_NOTICE, "Initialization complete");
 
-#if 0
 	if (report_to_parent)
 		if((res = notify_parent(0)) < 0)
 			goto terminate;
-#endif
 
 	res = main_loop(listenfd);
 	if(res < 0)
@@ -462,14 +458,14 @@ terminate:
 			usbfluxd_log(LL_INFO, "Original usbmuxd socket file restored: %s -> %s", USBMUXD_RENAMED_SOCKET, USBMUXD_SOCKET_FILE);
 		}
 	}
-//	log_disable_syslog();
+	log_disable_syslog();
 
 	if (res < 0)
 		res = -res;
 	else
 		res = 0;
-//	if (report_to_parent)
-//		notify_parent(res);
+	if (report_to_parent)
+		notify_parent(res);
 
 	return res;
 }
