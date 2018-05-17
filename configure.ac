@@ -62,6 +62,24 @@ esac
 AC_SUBST(AC_LDADD)
 AM_CONDITIONAL(WIN32, test x$win32 = xtrue)
 
+AC_ARG_WITH([static-libplist],
+            [AS_HELP_STRING(["--with-static-libplist[=/path/to/static/libplist"]],
+            [link against a static libplist])],
+            [with_static_libplist=$withval],
+            [with_static_libplist=no])
+if test "x$with_static_libplist" != "xno"; then
+  if test "x$with_static_libplist" = "xyes"; then
+    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist |sed 's/^..//'`/libplist.a"
+  else
+    STATIC_LIBPLIST="$with_static_libplist"
+  fi
+  if ! test -f "$STATIC_LIBPLIST"; then
+    AC_MSG_ERROR([The file ${STATIC_LIBPLIST} passed to --with-static-libplist does not exist])
+  fi
+  echo "*** Note: Will link with static libplist found at ${STATIC_LIBPLIST} ***"
+  AC_SUBST(libplist_LIBS, [$STATIC_LIBPLIST])
+fi
+
 AS_COMPILER_FLAGS(GLOBAL_CFLAGS, "-g -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith  -Wwrite-strings -Wswitch-default -Wno-unused-parameter")
 AC_SUBST(GLOBAL_CFLAGS)
 
