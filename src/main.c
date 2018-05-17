@@ -382,6 +382,7 @@ int main(int argc, char *argv[])
 			} else {
 				socket_close(testfd);
 				usbfluxd_log(LL_FATAL, "Socket file '%s' is already present and seems to be in use. This might be due to another usbfluxd instance running or the original usbmuxd was restarted. Refusing to continue.", USBMUXD_SOCKET_FILE);
+				renamed = 0;
 				goto terminate;
 			}
 		}
