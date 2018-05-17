@@ -494,7 +494,7 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 				if (remote) {
 					usbmux_remote_dispose(remote);
 				}
-				usbfluxd_log(LL_INFO, "%s: Removed service %s", __func__, service_name);
+				usbfluxd_log(LL_NOTICE, "%s: Removed service %s", __func__, service_name);
 				pthread_mutex_unlock(&remote_list_mutex);
 				free(service_name);
 			}
@@ -531,7 +531,7 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 					pthread_mutex_lock(&remote_list_mutex);
 					remote->id = remote_id++;
 					remote->service_name = service_name;
-					usbfluxd_log(LL_INFO, "%s: Added service %s", __func__, service_name);
+					usbfluxd_log(LL_NOTICE, "%s: Added service %s", __func__, service_name);
 					service_name = NULL;
 					collection_add(&remote_list, remote);
 					remote_send_listen_packet(remote);
