@@ -150,34 +150,6 @@ static plist_t create_plist_message(const char* message_type)
 	return plist;
 }
 
-
-#if 0
-int usbmux_remote_send_pkt(struct remote_mux *remote, void *buffer, unsigned int length)
-{
-	usbmuxd_log(LL_DEBUG, "%s fd %d buffer_length %d", __func__, remote->fd, length);
-
-	uint32_t available = remote->ob_capacity - remote->ob_size;
-	/* the output buffer _should_ be large enough, but just in case */
-	if(available < length) {
-		unsigned char* new_buf;
-		uint32_t new_size = ((remote->ob_capacity + length + 4096) / 4096) * 4096;
-		usbmuxd_log(LL_DEBUG, "%s: Enlarging remote %d usbmux output buffer %d -> %d", __func__, remote->fd, remote->ob_capacity, n
-ew_size);
-		new_buf = realloc(remote->ob_buf, new_size);
-		if (!new_buf) {
-			usbmuxd_log(LL_FATAL, "%s: Failed to realloc.", __func__);
-			return -1;
-		}
-		remote->ob_buf = new_buf;
-		remote->ob_capacity = new_size;
-	}
-	memcpy(remote->ob_buf + remote->ob_size, buffer, length);
-	remote->ob_size += length;
-	remote->events |= POLLOUT;
-	return length;
-}
-#endif
-
 static int remote_send_pkt(struct remote_mux *remote, uint32_t tag, enum usbmuxd_msgtype msg, void *payload, int payload_length)
 {
 	struct usbmuxd_header hdr;
@@ -775,14 +747,6 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 	int res = 0;
 	usbfluxd_log(LL_DEBUG, "%s fd %d len %d ver %d msg %d tag %d", __func__, remote->fd, hdr->length, hdr->version, hdr->message, hdr->tag);
 
-	/*if (remote->state != CLIENT_COMMAND) {
-		usbfluxd_log(LL_ERROR, "Client %d command received in the wrong state", remote->fd);
-		if(send_result(remote, hdr->tag, RESULT_BADCOMMAND) < 0)
-			return -1;
-		client_close(client);
-		return -1;
-	}*/
-
 	if ((hdr->version != 0) && (hdr->version != 1)) {
 		usbfluxd_log(LL_INFO, "remote %d version mismatch: expected 0 or 1, got %d", remote->fd, hdr->version);
 		//send_result(client, hdr->tag, RESULT_BADVERSION);
@@ -808,15 +772,6 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		} else if (remote->last_command == REMOTE_CMD_READ_BUID) {
 			client_send_packet_data(remote->client, hdr, payload, payload_size);
 		} else if (remote->last_command == REMOTE_CMD_READ_PAIR_RECORD) {
-#if 0 /* DEBUG */
-			plist_t prdata = plist_dict_get_item(plist_msg, "PairRecordData");
-			if (prdata) {
-				usbfluxd_log(LL_DEBUG, "%s: got result for ReadPairRecord command", __func__);
-			} else {
-				uint32_t result = message_get_result(hdr, payload, payload_size, plist_msg);
-				usbfluxd_log(LL_ERROR, "%s: Could not get pair record, error %d", __func__, result);
-			}
-#endif
 			client_send_packet_data(remote->client, hdr, payload, payload_size);
 		} else if (remote->last_command == REMOTE_CMD_SAVE_PAIR_RECORD) {
 			client_send_packet_data(remote->client, hdr, payload, payload_size);
