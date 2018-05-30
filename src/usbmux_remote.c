@@ -961,13 +961,8 @@ void usbmux_remote_process(int fd, short events)
 				usbmux_remote_close(remote);
 				return;
 			} else if (r == 0) {
-				int e = errno;
-				usbfluxd_log(LL_DEBUG, "%s: remote read returned 0, errno=%d", __func__, e);
-				if (e != 0) {
-					usbfluxd_log(LL_ERROR, "%s: recv from remote (fd %d) return 0 errno=%d (%s)", __func__, remote->fd, e, strerror(e));
-					usbmux_remote_close(remote);
-					return;
-				}
+				usbfluxd_log(LL_DEBUG, "%s: remote read returned 0", __func__);
+				remote->events &= ~POLLIN;
 			} else if (r > 0) {
 				usbfluxd_log(LL_DEBUG, "%s: read %d bytes from remote (fd %d) requested %u", __func__, r, remote->fd, remote->ib_capacity - remote->ib_size);
 				remote->ib_size += r;
@@ -980,6 +975,9 @@ void usbmux_remote_process(int fd, short events)
 			remote_process_send(remote);
 			//client_set_events(remote->client, POLLIN); //client->events |= POLLIN;
 			client_or_events(remote->client, POLLIN);
+		} else {
+			usbfluxd_log(LL_DEBUG, "%s: called but no incoming or outgoing traffic.", __func__);
+			usbmux_remote_close(remote);
 		}
 	} else {
 		if (events & POLLIN) {
