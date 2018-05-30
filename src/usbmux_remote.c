@@ -323,10 +323,8 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 	pthread_mutex_lock(&remote_list_mutex);
 	plist_dict_foreach(remote_device_list, match_device, &matchctx);
 	if (matchctx.device_id == 0) {
-		// FIXME TODO
-		usbfluxd_log(LL_ERROR, "%s: FIXME: ReadPairRecord request for non-connected device. What now?", __func__);
-		pthread_mutex_unlock(&remote_list_mutex);
-		return -1;
+		usbfluxd_log(LL_DEBUG, "%s: ReadPairRecord request for non-connected device %s. Forwardning to local usbmuxd.", __func__, record_id);
+		remote = remote_mux_new_with_unix_socket(USBMUXD_RENAMED_SOCKET);
 	} else {
 		uint8_t remote_mux_id = matchctx.device_id >> 24;
 		if (remote_mux_id == 0) {
@@ -369,10 +367,8 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 	pthread_mutex_lock(&remote_list_mutex);
 	plist_dict_foreach(remote_device_list, match_device, &matchctx);
 	if (matchctx.device_id == 0) {
-		// FIXME TODO
-		usbfluxd_log(LL_ERROR, "%s: FIXME: SavePairRecord request for non-connected device. What now?", __func__);
-		pthread_mutex_unlock(&remote_list_mutex);
-		return -1;
+		usbfluxd_log(LL_DEBUG, "%s: SavePairRecord request for non-connected device %s. Forwarding to local usbmuxd.", __func__, record_id);
+		remote = remote_mux_new_with_unix_socket(USBMUXD_RENAMED_SOCKET);
 	} else {
 		uint8_t remote_mux_id = matchctx.device_id >> 24;
 		if (remote_mux_id == 0) {
@@ -411,10 +407,8 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 	pthread_mutex_lock(&remote_list_mutex);
 	plist_dict_foreach(remote_device_list, match_device, &matchctx);
 	if (matchctx.device_id == 0) {
-		// FIXME TODO
-		usbfluxd_log(LL_ERROR, "%s: FIXME: DeletePairRecord request for non-connected device. What now?", __func__);
-		pthread_mutex_unlock(&remote_list_mutex);
-		return -1;
+		usbfluxd_log(LL_DEBUG, "%s: DeletePairRecord request for non-connected device %s. Forwarding to local usbmuxd.", __func__, record_id);
+		remote = remote_mux_new_with_unix_socket(USBMUXD_RENAMED_SOCKET);
 	} else {
 		uint8_t remote_mux_id = matchctx.device_id >> 24;
 		if (remote_mux_id == 0) {
@@ -782,7 +776,6 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		}
 		remote->last_command = -1;
 	} else if (remote->state == REMOTE_LISTEN) {
-		//usbfluxd_log(LL_INFO, "%s: received in LISTEN state", __func__);
 		int type = 0;
 		uint32_t devid = 0;
 		if (hdr->message == MESSAGE_DEVICE_ADD) {
