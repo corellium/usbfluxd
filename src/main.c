@@ -266,7 +266,8 @@ static int notify_parent(int status)
 static void usage()
 {
 	printf("Usage: %s [OPTIONS]\n", PACKAGE_NAME);
-	printf("Expose a socket to multiplex connections from and to iOS devices.\n\n");
+	printf("Redirects the standard usbmuxd socket to allow connections to local and\n");
+	printf("remote usbmuxd instances so remote devices appear connected locally.\n\n");
 	printf("  -h, --help\t\tPrint this message.\n");
 	printf("  -v, --verbose\t\tBe verbose (use twice or more to increase).\n");
 	printf("  -f, --foreground\tDo not daemonize (implies one -v).\n");
