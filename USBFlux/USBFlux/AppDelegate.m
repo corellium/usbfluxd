@@ -98,8 +98,6 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     return err;
 }
 
-static BOOL usbfluxdPermissionsChecked = NO;
-
 @implementation AppDelegate
 
 - (AuthorizationRef)getAuth:(NSString*)msg
