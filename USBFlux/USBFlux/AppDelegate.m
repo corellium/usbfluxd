@@ -247,6 +247,9 @@ static BOOL usbfluxdPermissionsChecked = NO;
 
 - (void)checkStatus:(NSTimer*)timer
 {
+    if (!timer) {
+        wasRunning = ![self isRunning];
+    }
     if ([self isRunning]) {
         self.statusLabel.stringValue = @"USBFlux is running.";
         self.startStopButton.title = @"Stop";
@@ -288,6 +291,21 @@ static BOOL usbfluxdPermissionsChecked = NO;
 - (void)applicationWillTerminate:(NSNotification *)aNotification
 {
     [checkTimer invalidate];
+
+    if ([self isRunning]) {
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setAlertStyle:NSAlertStyleWarning];
+        NSButton *btnYes = [alert addButtonWithTitle:@"Yes"];
+        [btnYes setTag:1];
+        NSButton *btnNo = [alert addButtonWithTitle:@"No"];
+        [btnNo setTag:2];
+        [alert setMessageText:@"USBFlux still running"];
+        [alert setInformativeText:@"USBFlux is still running. Do you want to stop USBFlux now? Otherwise it will continue to run in the background despite this app being closed."];
+        BOOL res = [alert runModal];
+        if (res == 1) {
+            [self stopUSBFluxDaemon];
+        }
+    }
     free(usbfluxd_path);
     usbfluxd_path = NULL;
 }
