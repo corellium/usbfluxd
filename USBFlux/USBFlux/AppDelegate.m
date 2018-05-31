@@ -197,7 +197,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     }
     
     char *command = usbfluxd_path;
-    char *args[] = { "-vvv", NULL };
+    char *args[] = { "-v", NULL };
     [self runCommandWithAuth:authorization command:command arguments:args];
 }
 
