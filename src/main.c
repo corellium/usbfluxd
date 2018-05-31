@@ -343,6 +343,11 @@ int main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (geteuid() != 0) {
+		fprintf(stderr, "FATAL: usbfluxd needs root privileges. Exiting.\n");
+		goto terminate;
+	}
+
 	if (!foreground) {
 		verbose += LL_WARNING;
 		log_enable_syslog();
@@ -352,11 +357,6 @@ int main(int argc, char *argv[])
 
 	/* set log level to specified verbosity */
 	log_level = verbose;
-
-	if (getuid() != 0) {
-		usbfluxd_log(LL_FATAL, "FATAL: usbfluxd needs root privileges. Exiting.");
-		goto terminate;
-	}
 
 	usbfluxd_log(LL_NOTICE, "usbfluxd v%s starting up", PACKAGE_VERSION);
 	should_exit = 0;
