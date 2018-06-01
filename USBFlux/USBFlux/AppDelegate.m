@@ -229,18 +229,24 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     return result;
 }
 
+-(void)startFailAlert
+{
+    NSAlert* alert = [[NSAlert alloc] init];
+    [alert setAlertStyle:NSAlertStyleWarning];
+    [alert addButtonWithTitle:@"OK"];
+    [alert setMessageText:@"Missing Permissions"];
+    [alert setInformativeText:@"USBFlux cannot be started without elevated privileges."];
+    [alert runModal];
+    wasRunning = !wasRunning;
+}
+
 -(void)startUSBFluxDaemon
 {
     if (!authorization) {
         authorization = [self getAuth:@"USBFlux needs elevated permissions to start."];
     }
     if (!authorization) {
-        NSAlert* alert = [[NSAlert alloc] init];
-        [alert setAlertStyle:NSAlertStyleWarning];
-        [alert addButtonWithTitle:@"OK"];
-        [alert setMessageText:@"Missing Permissions"];
-        [alert setInformativeText:@"USBFlux cannot be started without elevated privileges."];
-        [alert runModal];
+        [self performSelectorOnMainThread:@selector(startFailAlert) withObject:nil waitUntilDone:YES];
         return;
     }
     
@@ -253,18 +259,24 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     [self runCommandWithAuth:authorization command:command arguments:args];
 }
 
+-(void)stopFailAlert
+{
+    NSAlert* alert = [[NSAlert alloc] init];
+    [alert setAlertStyle:NSAlertStyleWarning];
+    [alert addButtonWithTitle:@"OK"];
+    [alert setMessageText:@"Missing Permissions"];
+    [alert setInformativeText:@"USBFlux cannot be stopped without elevated privileges."];
+    [alert runModal];
+    wasRunning = !wasRunning;
+}
+
 -(void)stopUSBFluxDaemon
 {
     if (!authorization) {
         authorization = [self getAuth:@"USBFlux needs elevated permissions to stop."];
     }
     if (!authorization) {
-        NSAlert* alert = [[NSAlert alloc] init];
-        [alert setAlertStyle:NSAlertStyleWarning];
-        [alert addButtonWithTitle:@"OK"];
-        [alert setMessageText:@"Missing Permissions"];
-        [alert setInformativeText:@"USBFlux cannot be stopped without elevated privileges."];
-        [alert runModal];
+        [self performSelectorOnMainThread:@selector(stopFailAlert) withObject:nil waitUntilDone:YES];
         return;
     }
     
