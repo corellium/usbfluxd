@@ -11,6 +11,8 @@
 
 #include <sys/sysctl.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 static AuthorizationRef authorization = nil;
 static BOOL wasRunning = YES;
@@ -22,9 +24,59 @@ static BOOL wasRunning = YES;
     char *usbfluxd_path;
 }
 @property (weak) IBOutlet NSTextField *statusLabel;
+@property (weak) IBOutlet NSTextField *detailLabel;
 @property (weak) IBOutlet NSWindow *window;
 @property (weak) IBOutlet NSButton *startStopButton;
 @end
+
+struct usbmuxd_header {
+    uint32_t length;    // length of message, including header
+    uint32_t version;   // protocol version
+    uint32_t message;   // message type
+    uint32_t tag;       // responses to this query will echo back this tag
+} __attribute__((__packed__));
+
+static int socket_connect_unix(const char *filename)
+{
+    struct sockaddr_un name;
+    int sfd = -1;
+    struct stat fst;
+#ifdef SO_NOSIGPIPE
+    int yes = 1;
+#endif
+
+    // check if socket file exists...
+    if (stat(filename, &fst) != 0) {
+        return -1;
+    }
+    // ... and if it is a unix domain socket
+    if (!S_ISSOCK(fst.st_mode)) {
+        return -1;
+    }
+    // make a new socket
+    if ((sfd = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0) {
+        return -1;
+    }
+
+#ifdef SO_NOSIGPIPE
+    if (setsockopt(sfd, SOL_SOCKET, SO_NOSIGPIPE, (void*)&yes, sizeof(int)) == -1) {
+        close(sfd);
+        return -1;
+    }
+#endif
+
+    // and connect to 'filename'
+    name.sun_family = AF_UNIX;
+    strncpy(name.sun_path, filename, sizeof(name.sun_path));
+    name.sun_path[sizeof(name.sun_path) - 1] = 0;
+
+    if (connect(sfd, (struct sockaddr *) &name, sizeof(name)) < 0) {
+        close(sfd);
+        return -1;
+    }
+
+    return sfd;
+}
 
 static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 {
@@ -215,9 +267,36 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         [alert runModal];
         return;
     }
-    char *command = "/usr/bin/killall";
-    char *args[] = { "usbfluxd", NULL };
-    [self runCommandWithAuth:authorization command:command arguments:args];
+    
+    struct kinfo_proc *proc_list = NULL;
+    size_t proc_count;
+
+    pid_t pid = 0;
+
+    if (get_process_list(&proc_list, &proc_count) != 0) {
+        NSLog(@"ERR failed to get process list");
+    } else {
+        int i;
+        for (i = 0; i < proc_count; i++) {
+            if (strcmp(proc_list[i].kp_proc.p_comm, "usbfluxd") == 0) {
+                pid = proc_list[i].kp_proc.p_pid;
+                break;
+            }
+        }
+        free(proc_list);
+    }
+    
+    if (pid > 0) {
+        char pid_s[10];
+        sprintf(pid_s, "%d", pid);
+        char *command = "/bin/kill";
+        char *args[] = { pid_s, NULL };
+        [self runCommandWithAuth:authorization command:command arguments:args];
+    } else {
+        char *command = "/usr/bin/killall";
+        char *args[] = { "usbfluxd", NULL };
+        [self runCommandWithAuth:authorization command:command arguments:args];
+    }
 }
 
 - (BOOL)isRunning
@@ -243,18 +322,99 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     return found;
 }
 
+- (NSDictionary*)getInstances
+{
+    id result = nil;
+
+    int sfd = socket_connect_unix("/var/run/usbmuxd");
+    if (sfd < 0) {
+        return nil;
+    }
+
+    const char req_xml[] = "<plist version=\"1.0\"><dict><key>MessageType</key><string>Instances</string></dict></plist>";
+    char buf[65536];
+    
+    struct usbmuxd_header muxhdr;
+    muxhdr.length = sizeof(struct usbmuxd_header) + sizeof(req_xml);
+    muxhdr.version = 1;
+    muxhdr.message = 8;
+    muxhdr.tag = 0;
+    
+    if (send(sfd, &muxhdr, sizeof(struct usbmuxd_header), 0) == sizeof(struct usbmuxd_header)) {
+        if (send(sfd, req_xml, sizeof(req_xml), 0) == sizeof(req_xml)) {
+            if (recv(sfd, &muxhdr, sizeof(struct usbmuxd_header), 0) == sizeof(struct usbmuxd_header)) {
+                if ((muxhdr.version == 1) && (muxhdr.message == 8) && (muxhdr.tag == 0)) {
+                    char *p = &buf[0];
+                    uint32_t rr = 0;
+                    uint32_t total = muxhdr.length - sizeof(struct usbmuxd_header);
+                    if (total > sizeof(buf)) {
+                        p = malloc(total);
+                    } else {
+                        p = &buf[0];
+                    }
+                    while (rr < total) {
+                        ssize_t r = recv(sfd, p + rr, total - rr, 0);
+                        if (r < 0) {
+                            break;
+                        }
+                        rr += r;
+                    }
+                    if (rr == total) {
+                        NSDictionary *dict = [NSPropertyListSerialization propertyListWithData:[NSData dataWithBytesNoCopy:p length:total freeWhenDone:NO] options:0 format:nil error:nil];
+                        NSDictionary *instances = (dict) ? [dict objectForKey:@"Instances"] : nil;
+                        if (instances) {
+                            result = instances;
+                        }
+                    } else {
+                        NSLog(@"Could not get all data back");
+                    }
+                    if (total > sizeof(buf)) {
+                        free(p);
+                    }
+                }
+            } else {
+                NSLog(@"didn't receive as much data as we need");
+            }
+        }
+    }
+    close(sfd);
+    
+    return result;
+}
+
 - (void)checkStatus:(NSTimer*)timer
 {
+    NSDictionary *instances = [self getInstances];
     if (!timer) {
-        wasRunning = ![self isRunning];
+        wasRunning = (instances == nil);
     }
-    if ([self isRunning]) {
+    if (instances) {
         self.statusLabel.stringValue = @"USBFlux is running.";
         self.startStopButton.title = @"Stop";
         self.startStopButton.tag = 1;
         if (!wasRunning) {
             self.startStopButton.enabled = YES;
         }
+        int local_devices = 0;
+        int local_count = 0;
+        int remote_devices = 0;
+        int remote_count = 0;
+        for (NSString *key in instances) {
+            NSDictionary *entry = [instances objectForKey:key];
+            if ([[entry objectForKey:@"IsUnix"] boolValue]) {
+                local_devices += [[entry objectForKey:@"DeviceCount"] intValue];
+                local_count++;
+            } else {
+                remote_devices += [[entry objectForKey:@"DeviceCount"] intValue];
+                remote_count++;
+            }
+        }
+        NSDictionary* localInst = [instances objectForKey:@"0"];
+        if (localInst) {
+            local_devices = [[localInst objectForKey:@"DeviceCount"] intValue];
+        }
+        self.detailLabel.stringValue = [NSString stringWithFormat:@"%d Instance%s (%d Local / %d Remote)\n%d Device%s (%d Local / %d Remote)", local_count+remote_count,  (local_count+remote_count == 1) ? "" : "s", local_count, remote_count, local_devices+remote_devices, (local_devices+remote_devices == 1) ? "" : "s", local_devices, remote_devices];
+        self.detailLabel.hidden = NO;
         wasRunning = YES;
     } else {
         self.statusLabel.stringValue = @"USBFlux is not running.";
@@ -263,6 +423,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         if (wasRunning) {
             self.startStopButton.enabled = YES;
         }
+        self.detailLabel.hidden = YES;
         wasRunning = NO;
     }
 }
