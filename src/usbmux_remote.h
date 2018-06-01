@@ -54,6 +54,7 @@ struct remote_mux {
 	enum remote_state state;
 	enum remote_command last_command;
 	uint8_t id;
+	uint8_t is_listener;
 	char *service_name;
 	int is_unix;
 	char *host;
@@ -65,6 +66,7 @@ void usbmux_remote_init(void);
 void usbmux_remote_shutdown(void);
 
 plist_t usbmux_remote_get_device_list();
+plist_t usbmux_remote_get_instances();
 
 int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, struct mux_client *client);
 

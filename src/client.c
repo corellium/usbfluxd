@@ -421,6 +421,19 @@ static int send_device_list(struct mux_client *client, uint32_t tag)
 	return res;
 }
 
+static int send_instances(struct mux_client *client, uint32_t tag)
+{
+	int res = -1;
+
+	plist_t dict = plist_new_dict();
+	plist_t instances = usbmux_remote_get_instances();
+	plist_dict_set_item(dict, "Instances", instances);
+	res = send_plist_pkt(client, tag, dict);
+	plist_free(dict);
+
+	return res;
+}
+
 static int notify_device_add(struct mux_client *client, plist_t dev)
 {
 	int res = -1;
@@ -632,6 +645,12 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					plist_free(dict);
 					res = usbmux_remote_delete_pair_record(record_id, hdr->tag, client);
 					if (res < 0)
+						return -1;
+					return 0;
+				} else if (!strcmp(message, "Instances")) {
+					free(message);
+					plist_free(dict);
+					if (send_instances(client, hdr->tag) < 0)
 						return -1;
 					return 0;
 				} else {

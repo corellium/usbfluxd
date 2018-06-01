@@ -525,6 +525,7 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 					pthread_mutex_lock(&remote_list_mutex);
 					remote->id = remote_id++;
 					remote->service_name = service_name;
+					remote->is_listener = 1;
 					usbfluxd_log(LL_NOTICE, "%s: Added service %s", __func__, service_name);
 					service_name = NULL;
 					collection_add(&remote_list, remote);
@@ -579,6 +580,7 @@ void usbmux_remote_init(void)
 	if (remote) {
 		pthread_mutex_lock(&remote_list_mutex);
 		remote->id = 0;
+		remote->is_listener = 1;
 		collection_add(&remote_list, remote);
 		remote_send_listen_packet(remote);
 		pthread_mutex_unlock(&remote_list_mutex);
@@ -697,6 +699,53 @@ plist_t usbmux_remote_get_device_list()
 	plist_dict_foreach(remote_device_list, array_append_item_copy, devices);
 	pthread_mutex_unlock(&remote_list_mutex);
 	return devices;
+}
+
+struct remote_inst_info {
+	int id;
+	plist_t array;
+};
+
+static int remote_device_get_for_instance(const char* key, const plist_t value, void *context)
+{
+	struct remote_inst_info* inst_info = (struct remote_inst_info*)context;
+	uint32_t val = strtol(key, NULL, 16);
+	if ((val >> 24) == inst_info->id) {
+		plist_t udid = plist_access_path(value, 2, "Properties", "SerialNumber");
+		if (udid) {
+			plist_array_append_item(inst_info->array, plist_copy(udid));
+		}
+	}
+	return 0;
+}
+
+plist_t usbmux_remote_get_instances()
+{
+	plist_t dict = plist_new_dict();
+	pthread_mutex_lock(&remote_list_mutex);
+	FOREACH(struct remote_mux *remote, &remote_list) {
+		if (remote->is_listener && remote->state == REMOTE_LISTEN) {
+			plist_t entry = plist_new_dict();
+			plist_dict_set_item(entry, "IsUnix", plist_new_bool(remote->is_unix));
+			if (!remote->is_unix) {
+				plist_dict_set_item(entry, "ServiceName", plist_new_string(remote->service_name));
+				plist_dict_set_item(entry, "Host", plist_new_string(remote->host));
+				plist_dict_set_item(entry, "Port", plist_new_uint(remote->port));
+			}
+			plist_t devices = plist_new_array();
+			struct remote_inst_info inst_info = { remote->id, devices };
+			plist_dict_foreach(remote_device_list, remote_device_get_for_instance, &inst_info);
+
+			plist_dict_set_item(entry, "DeviceCount", plist_new_uint(plist_array_get_size(devices)));
+			plist_dict_set_item(entry, "Devices", devices);
+
+			char id_str[8];
+			sprintf(id_str, "%d", remote->id);
+			plist_dict_set_item(dict, id_str, entry);
+		}
+	} ENDFOREACH
+	pthread_mutex_unlock(&remote_list_mutex);
+	return dict;
 }
 
 static plist_t create_device_attached_plist(struct device_info *dev)
