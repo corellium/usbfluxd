@@ -442,16 +442,46 @@ static int notify_device_add(struct mux_client *client, plist_t dev)
 		/* XML plist packet */
 		res = send_plist_pkt(client, 0, dev);
 	} else {
-		usbfluxd_log(LL_FATAL, "%s: FATAL: FIXME TODO - need implementation of proto version 0", __func__);
 		/* binary packet */
-		/*struct usbmuxd_device_record dmsg;
+		struct usbmuxd_device_record dmsg;
+		plist_t node;
+		uint64_t u64val = 0;
+		char *strval = NULL;
+
 		memset(&dmsg, 0, sizeof(dmsg));
-		dmsg.device_id = dev->id;
-		strncpy(dmsg.serial_number, dev->serial, 256);
+
+		node = plist_dict_get_item(dev, "DeviceID");
+		if (node) {
+			plist_get_uint_val(node, &u64val);
+			dmsg.device_id = (uint32_t)u64val;
+		}
+
+		node = plist_access_path(dev, 2, "Properties", "SerialNumber");
+		if (node) {
+			strval = NULL;
+			plist_get_string_val(node, &strval);
+			if (strval) {
+				strncpy(dmsg.serial_number, strval, 256);
+				free(strval);
+			}
+		}
 		dmsg.serial_number[255] = 0;
-		dmsg.location = dev->location;
-		dmsg.product_id = dev->pid;
-		res = send_pkt(client, 0, MESSAGE_DEVICE_ADD, &dmsg, sizeof(dmsg));*/
+
+		node = plist_access_path(dev, 2, "Properties", "LocationID");
+		if (node) {
+			u64val = 0;
+			plist_get_uint_val(node, &u64val);
+			dmsg.location = (uint32_t)u64val;
+		}
+
+		node = plist_access_path(dev, 2, "Properties", "ProductID");
+		if (node) {
+			u64val = 0;
+			plist_get_uint_val(node, &u64val);
+			dmsg.product_id = (uint16_t)u64val;
+		}
+
+		res = send_pkt(client, 0, MESSAGE_DEVICE_ADD, &dmsg, sizeof(dmsg));
 	}
 	return res;
 }
@@ -667,7 +697,6 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 		case MESSAGE_LISTEN:
 			if(send_result(client, hdr->tag, 0) < 0)
 				return -1;
-			usbfluxd_log(LL_DEBUG, "Client %d now LISTENING", client->fd);
 			return start_listen(client);
 		case MESSAGE_CONNECT:
 			ch = (void*)hdr;
@@ -675,7 +704,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 			plist_t msg = plist_new_dict();
 			plist_dict_set_item(msg, "MessageType", plist_new_string("Connect"));
 			plist_dict_set_item(msg, "DeviceID", plist_new_uint(ch->device_id));
-			plist_dict_set_item(msg, "PortNumber", plist_new_uint(ntohs(ch->port)));
+			plist_dict_set_item(msg, "PortNumber", plist_new_uint(ch->port));
 			res = usbmux_remote_connect(ch->device_id, hdr->tag, msg, client);
 			plist_free(msg);
 			if(res < 0) {
