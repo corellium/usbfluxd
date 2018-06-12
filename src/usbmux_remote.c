@@ -224,6 +224,7 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 			if (r->id == remote_mux_id && r->state == REMOTE_LISTEN) {
 				remote = remote_mux_new_with_host(r->host, r->port);
 				remote->id = remote_mux_id;
+				break;
 			}	
 		} ENDFOREACH
 	}
@@ -272,6 +273,7 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
 		FOREACH(struct remote_mux *r, &remote_list) {
 			if (r->state == REMOTE_LISTEN && r->id == remote_mux_id) {
 				remote = remote_mux_new_with_host(r->host, r->port);
+				break;
 			}
 		} ENDFOREACH
 	}
@@ -333,6 +335,7 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 			FOREACH(struct remote_mux *r, &remote_list) {
 				if (r->state == REMOTE_LISTEN && r->id == remote_mux_id) {
 					remote = remote_mux_new_with_host(r->host, r->port);
+					break;
 				}
 			} ENDFOREACH
 		}
@@ -377,6 +380,7 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 			FOREACH(struct remote_mux *r, &remote_list) {
 				if (r->state == REMOTE_LISTEN && r->id == remote_mux_id) {
 					remote = remote_mux_new_with_host(r->host, r->port);
+					break;
 				}
 			} ENDFOREACH
 		}
@@ -417,6 +421,7 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 			FOREACH(struct remote_mux *r, &remote_list) {
 				if (r->state == REMOTE_LISTEN && r->id == remote_mux_id) {
 					remote = remote_mux_new_with_host(r->host, r->port);
+					break;
 				}
 			} ENDFOREACH
 		}
