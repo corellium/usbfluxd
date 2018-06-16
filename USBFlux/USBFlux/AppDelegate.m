@@ -396,6 +396,9 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 
 - (void)checkStatus:(NSTimer*)timer
 {
+    if (![self.window isVisible]) {
+        return;
+    }
     NSDictionary *instances = [self getInstances];
     if (!timer) {
         wasRunning = (instances == nil);
