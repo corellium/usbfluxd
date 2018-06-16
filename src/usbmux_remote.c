@@ -573,6 +573,24 @@ monitor_thread_cleanup:
 	return NULL;
 }
 
+int usbmux_remote_add_remote(const char *host_name, uint16_t port)
+{
+	int res = -1;
+	struct remote_mux *remote = remote_mux_new_with_host(host_name, port);
+	if (remote) {
+		pthread_mutex_lock(&remote_list_mutex);
+		remote->id = remote_id++;
+		remote->is_listener = 1;
+		remote->service_name = strdup(host_name);
+		usbfluxd_log(LL_NOTICE, "Added remote %s:%d", host_name, port);
+		collection_add(&remote_list, remote);
+		remote_send_listen_packet(remote);
+		pthread_mutex_unlock(&remote_list_mutex);
+		res = 0;
+	}
+	return res;
+}
+
 void usbmux_remote_init(void)
 {
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
@@ -629,6 +647,7 @@ static void remote_close(struct remote_mux *remote)
 	collection_remove(&remote_list, remote);
 
 	free(remote->host);	
+	free(remote->service_name);
 	free(remote->ob_buf);
 	free(remote->ib_buf);
 	free(remote);
@@ -667,7 +686,12 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	plist_dict_foreach(remote_device_list, remote_device_notify_remove, (void*)remote);
 	collection_remove(&remote_list, remote);
 
+	if (remote->is_listener && remote->host) {
+		usbfluxd_log(LL_NOTICE, "NOTE: remote %s:%d is no longer available.", remote->host, remote->port);
+	}
+
 	free(remote->host);
+	free(remote->service_name);
 	free(remote->ob_buf);
 	free(remote->ib_buf);
 	free(remote);

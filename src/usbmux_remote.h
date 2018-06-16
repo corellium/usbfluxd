@@ -74,19 +74,16 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client);
 int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct mux_client *client);
 int usbmux_remote_save_pair_record(const char* record_id, plist_t req_plist, uint32_t tag, struct mux_client *client);
 int usbmux_remote_delete_pair_record(const char* record_id, uint32_t tag, struct mux_client *client);
-//int usbmux_remote_send_pkt(struct remote_mux *remote, void *buffer, unsigned int length);
 
 void usbmux_remote_close(struct remote_mux *remote);
 void usbmux_remote_dispose(struct remote_mux *remote);
 
 void usbmux_remote_notify_client_close(struct remote_mux *remote);
-//void usbmux_remote_notify_client_close(struct mux_client *client);
 
 void usbmux_remote_get_fds(struct fdlist *list);
 
-//int usbmux_remote_read(struct remote_mux *remote, void *buffer, uint32_t len);
-//int usbmux_remote_write(struct remote_mux *remote, void *buffer, uint32_t len);
-
 void usbmux_remote_process(int fd, short events);
+
+int usbmux_remote_add_remote(const char *host_name, uint16_t port);
 
 #endif

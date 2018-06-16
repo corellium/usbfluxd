@@ -50,26 +50,6 @@
 #define CMD_BUF_SIZE	0x10000
 #define REPLY_BUF_SIZE	0x10000
 
-// {{{ FIXME this is temporary
-static int remote_port = 5000;
-static char *remote_host = NULL;
-
-void client_set_remote_port(int port)
-{
-	remote_port = port;
-}
-
-void client_set_remote_host(char *host)
-{
-	free(remote_host);
-	if (host) {
-		remote_host = strdup(host);
-	} else {
-		remote_host = NULL;
-	}
-}
-// end FIXME }}}
-
 enum client_state {
 	CLIENT_COMMAND,		// waiting for command
 	CLIENT_LISTEN,		// listening for devices

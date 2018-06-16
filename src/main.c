@@ -57,6 +57,9 @@ static int foreground = 0;
 static int daemon_pipe;
 static int renamed = 0;
 
+static char *remote_host = NULL;
+static uint16_t remote_port = 0;
+
 static int report_to_parent = 0;
 
 static void handle_signal(int sig)
@@ -275,9 +278,6 @@ static void usage()
 	printf("\n");
 }
 
-extern void client_set_remote_port(int port);
-extern void client_set_remote_host(char *host);
-
 static void parse_opts(int argc, char **argv)
 {
 	static struct option longopts[] = {
@@ -315,14 +315,13 @@ static void parse_opts(int argc, char **argv)
 			char *colon = strchr(optarg, ':');
 			if (colon) {
 				size_t hostSize = (uintptr_t)(colon - optarg + 1);
-				char *host = calloc(1, hostSize);
-				strncpy(host, optarg, hostSize - 1);
-				host[hostSize - 1] = 0;
-				client_set_remote_port(strtoul(colon + 1, NULL, 10));
-				client_set_remote_host(host);
-				free(host);
+				remote_host = calloc(1, hostSize);
+				strncpy(remote_host, optarg, hostSize - 1);
+				remote_host[hostSize - 1] = 0;
+				remote_port = strtoul(colon + 1, NULL, 10);
 			} else {
-				client_set_remote_host(optarg);
+				remote_host = strdup(optarg);
+				remote_port = 5000;
 			}
 			break;
 		}
@@ -439,6 +438,12 @@ int main(int argc, char *argv[])
 
 	usbfluxd_log(LL_NOTICE, "Initialization complete");
 
+	if (remote_host) {
+		if (usbmux_remote_add_remote(remote_host, remote_port) < 0) {
+			usbfluxd_log(LL_ERROR, "ERROR: Failed to add %s:%d to list of remotes", remote_host, remote_port);
+		}
+	}
+
 	if (report_to_parent)
 		if((res = notify_parent(0)) < 0)
 			goto terminate;
@@ -461,6 +466,8 @@ terminate:
 		}
 	}
 	log_disable_syslog();
+
+	free(remote_host);
 
 	if (res < 0)
 		res = -res;
