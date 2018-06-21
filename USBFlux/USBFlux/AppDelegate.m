@@ -11,6 +11,7 @@
 
 #include <sys/sysctl.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <spawn.h>
@@ -487,6 +488,27 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         }
         self.detailLabel.hidden = YES;
         wasRunning = NO;
+    }
+}
+
+- (void)applicationWillFinishLaunching:(NSNotification *)notification
+{
+    const char *executable_path = [[[NSBundle mainBundle] executablePath] fileSystemRepresentation];
+    if (executable_path) {
+        struct statvfs fs;
+        bzero(&fs, sizeof(struct statvfs));
+        if (statvfs(executable_path, &fs) == 0) {
+            if (fs.f_flag & ST_RDONLY) {
+                [self.window setIsVisible:NO];
+                NSAlert* alert = [[NSAlert alloc] init];
+                [alert setAlertStyle:NSAlertStyleWarning];
+                [alert addButtonWithTitle:@"OK"];
+                [alert setMessageText:@"Cannot run from read-only volume"];
+                [alert setInformativeText:@"Please drag USBFlux.app into your Applications folder in order to run it."];
+                [alert runModal];
+                kill(getpid(), SIGTERM);
+            }
+        }
     }
 }
 
