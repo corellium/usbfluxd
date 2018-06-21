@@ -332,11 +332,13 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         free(proc_list);
     }
 
-    char *argv[3] = { terminate_path, NULL, NULL };
+    char pid_s[10];
+    pid_s[0] = '\0';
+    char *argv[3] = { terminate_path, pid_s, NULL };
     if (pid > 0) {
-        char pid_s[10];
         sprintf(pid_s, "%d", pid);
-        argv[1] = pid_s;
+    } else {
+        argv[1] = NULL;
     }
     
     posix_spawnattr_t spawnattr = NULL;
