@@ -290,9 +290,12 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     pid_t pid = 0;
     char *argv[] = { usbfluxd_path, "-v", NULL };
     char *env[] = { NULL };
-    int status = posix_spawn(&pid, usbfluxd_path, &action, &spawnattr, argv, env);
+    int status = posix_spawn(&pid, argv[0], &action, &spawnattr, argv, env);
     if (status != 0) {
         NSLog(@"posix_spawn failed: %s", strerror(status));
+    } else {
+        int status = -1;
+        waitpid(pid, &status, 0);
     }
 }
 
@@ -349,9 +352,13 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     posix_spawn_file_actions_init(&action);
     
     char *env[] = { NULL };
-    int status = posix_spawn(&pid, terminate_path, &action, &spawnattr, argv, env);
+    pid = 0;
+    int status = posix_spawn(&pid, argv[0], &action, &spawnattr, argv, env);
     if (status != 0) {
         NSLog(@"posix_spawn failed: %s", strerror(status));
+    } else {
+        int status = -1;
+        waitpid(pid, &status, 0);
     }
 }
 
