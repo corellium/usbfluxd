@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <spawn.h>
 
 static AuthorizationRef authorization = nil;
 static BOOL wasRunning = YES;
@@ -22,6 +23,7 @@ static BOOL wasRunning = YES;
     NSTimer *checkTimer;
     NSTask *usbfluxdTask;
     char *usbfluxd_path;
+    char *terminate_path;
 }
 @property (weak) IBOutlet NSTextField *statusLabel;
 @property (weak) IBOutlet NSTextField *detailLabel;
@@ -207,77 +209,108 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 
 - (void)fixupUSBFluxDaemonPermissions
 {
-    if (chmod(usbfluxd_path, 0755) != 0) {
-        if (authorization) {
-            char *command = "/bin/chmod";
-            char *args[] = { "755", usbfluxd_path, NULL };
-            [self runCommandWithAuth:authorization command:command arguments:args];
-        }
-    }
+    char *command1 = "/usr/sbin/chown";
+    char *args1[] = { "0:0", usbfluxd_path, terminate_path, NULL };
+    [self runCommandWithAuth:authorization command:command1 arguments:args1];
+
+    char *command2 = "/bin/chmod";
+    char *args2[] = { "4755", usbfluxd_path, terminate_path, NULL };
+    [self runCommandWithAuth:authorization command:command2 arguments:args2];
 }
 
 - (BOOL)checkUSBFluxDaemonPermissions
 {
-    BOOL result = NO;
     struct stat fst;
     bzero(&fst, sizeof(struct stat));
-    if (stat(usbfluxd_path, &fst) == 0) {
-        if ((fst.st_uid == 0) && (fst.st_mode == 0755)) {
-            result = YES;
-        }
+    if (stat(usbfluxd_path, &fst) != 0) {
+        return NO;
     }
-    return result;
+    if ((fst.st_uid != 0) || ((fst.st_mode & S_ISUID) != S_ISUID) || ((fst.st_mode & S_IXUSR) != S_IXUSR) || ((fst.st_mode & S_IRUSR) != S_IRUSR)) {
+        return NO;
+    }
+    bzero(&fst, sizeof(struct stat));
+    if (stat(terminate_path, &fst) != 0) {
+        return NO;
+    }
+    if ((fst.st_uid != 0) || ((fst.st_mode & S_ISUID) != S_ISUID) || ((fst.st_mode & S_IXUSR) != S_IXUSR) || ((fst.st_mode & S_IRUSR) != S_IRUSR)) {
+        return NO;
+    }
+    return YES;
 }
 
--(void)startFailAlert
+-(void)missingPermissionsAlert
 {
     NSAlert* alert = [[NSAlert alloc] init];
     [alert setAlertStyle:NSAlertStyleWarning];
     [alert addButtonWithTitle:@"OK"];
     [alert setMessageText:@"Missing Permissions"];
-    [alert setInformativeText:@"USBFlux cannot be started without elevated privileges."];
+    [alert setInformativeText:@"USBFlux cannot be configured without elevated privileges."];
+    [alert runModal];
+    wasRunning = !wasRunning;
+}
+
+-(void)configFailAlert
+{
+    NSAlert* alert = [[NSAlert alloc] init];
+    [alert setAlertStyle:NSAlertStyleWarning];
+    [alert addButtonWithTitle:@"OK"];
+    [alert setMessageText:@"Error"];
+    [alert setInformativeText:@"Failed to configure USBFlux."];
     [alert runModal];
     wasRunning = !wasRunning;
 }
 
 -(void)startUSBFluxDaemon
 {
-    if (!authorization) {
-        authorization = [self getAuth:@"USBFlux needs elevated permissions to start."];
-    }
-    if (!authorization) {
-        [self performSelectorOnMainThread:@selector(startFailAlert) withObject:nil waitUntilDone:YES];
-        return;
-    }
-    
     if (![self checkUSBFluxDaemonPermissions]) {
+        if (!authorization) {
+            authorization = [self getAuth:@"USBFlux needs elevated permissions to connect remote devices to USB."];
+        }
+        if (!authorization) {
+            [self performSelectorOnMainThread:@selector(missingPermissionsAlert) withObject:nil waitUntilDone:YES];
+            return;
+        }
+
         [self fixupUSBFluxDaemonPermissions];
+
+        if (![self checkUSBFluxDaemonPermissions]) {
+            [self performSelectorOnMainThread:@selector(configFailAlert) withObject:nil waitUntilDone:YES];
+            return;
+        }
     }
     
-    char *command = usbfluxd_path;
-    char *args[] = { "-v", NULL };
-    [self runCommandWithAuth:authorization command:command arguments:args];
-}
-
--(void)stopFailAlert
-{
-    NSAlert* alert = [[NSAlert alloc] init];
-    [alert setAlertStyle:NSAlertStyleWarning];
-    [alert addButtonWithTitle:@"OK"];
-    [alert setMessageText:@"Missing Permissions"];
-    [alert setInformativeText:@"USBFlux cannot be stopped without elevated privileges."];
-    [alert runModal];
-    wasRunning = !wasRunning;
+    posix_spawnattr_t spawnattr = NULL;
+    posix_spawnattr_init(&spawnattr);
+    
+    posix_spawn_file_actions_t action;
+    posix_spawn_file_actions_init(&action);
+    
+    pid_t pid = 0;
+    char *argv[] = { usbfluxd_path, "-v", NULL };
+    char *env[] = { NULL };
+    int status = posix_spawn(&pid, usbfluxd_path, &action, &spawnattr, argv, env);
+    if (status != 0) {
+        NSLog(@"posix_spawn failed: %s", strerror(status));
+    }
 }
 
 -(void)stopUSBFluxDaemon
 {
-    if (!authorization) {
-        authorization = [self getAuth:@"USBFlux needs elevated permissions to stop."];
-    }
-    if (!authorization) {
-        [self performSelectorOnMainThread:@selector(stopFailAlert) withObject:nil waitUntilDone:YES];
-        return;
+    if (![self checkUSBFluxDaemonPermissions]) {
+        if (!authorization) {
+            authorization = [self getAuth:@"USBFlux needs elevated permissions to connect remote devices to USB."];
+        }
+        if (!authorization) {
+            [self performSelectorOnMainThread:@selector(missingPermissionsAlert) withObject:nil waitUntilDone:YES];
+            return;
+        }
+
+        [self fixupUSBFluxDaemonPermissions];
+        
+        if (![self checkUSBFluxDaemonPermissions]) {
+            [self performSelectorOnMainThread:@selector(configFailAlert) withObject:nil waitUntilDone:YES];
+            return;
+        }
     }
     
     struct kinfo_proc *proc_list = NULL;
@@ -297,17 +330,24 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         }
         free(proc_list);
     }
-    
+
+    char *argv[3] = { terminate_path, NULL, NULL };
     if (pid > 0) {
         char pid_s[10];
         sprintf(pid_s, "%d", pid);
-        char *command = "/bin/kill";
-        char *args[] = { pid_s, NULL };
-        [self runCommandWithAuth:authorization command:command arguments:args];
-    } else {
-        char *command = "/usr/bin/killall";
-        char *args[] = { "usbfluxd", NULL };
-        [self runCommandWithAuth:authorization command:command arguments:args];
+        argv[1] = pid_s;
+    }
+    
+    posix_spawnattr_t spawnattr = NULL;
+    posix_spawnattr_init(&spawnattr);
+    
+    posix_spawn_file_actions_t action;
+    posix_spawn_file_actions_init(&action);
+    
+    char *env[] = { NULL };
+    int status = posix_spawn(&pid, terminate_path, &action, &spawnattr, argv, env);
+    if (status != 0) {
+        NSLog(@"posix_spawn failed: %s", strerror(status));
     }
 }
 
@@ -457,6 +497,20 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         [alert runModal];
     } else {
         usbfluxd_path = strdup([usbfluxdPath fileSystemRepresentation]);
+    }
+    NSString *terminatePath = [[NSBundle mainBundle] pathForResource:@"terminate" ofType:@"sh"];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:terminatePath]) {
+        terminate_path = NULL;
+        NSAlert* alert = [[NSAlert alloc] init];
+        [alert setAlertStyle:NSAlertStyleWarning];
+        [alert addButtonWithTitle:@"OK"];
+        [alert setMessageText:@"Missing File"];
+        [alert setInformativeText:@"The required file terminate.sh could not be found in the resources directory."];
+        [alert runModal];
+    } else {
+        terminate_path = strdup([terminatePath fileSystemRepresentation]);
+    }
+    if (usbfluxd_path && terminate_path) {
         [self checkStatus:nil];
         checkTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(checkStatus:) userInfo:nil repeats:YES];
     }
@@ -473,8 +527,8 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         [btnYes setTag:1];
         NSButton *btnNo = [alert addButtonWithTitle:@"No"];
         [btnNo setTag:2];
-        [alert setMessageText:@"USBFlux still running"];
-        [alert setInformativeText:@"USBFlux is still running. Do you want to stop USBFlux now? Otherwise it will continue to run in the background despite this app being closed."];
+        [alert setMessageText:@"USBFlux is still running"];
+        [alert setInformativeText:@"Do you want to stop USBFlux now? If \"No\" is selected, USBFlux will continue to run in the background."];
         BOOL res = [alert runModal];
         if (res == 1) {
             [self stopUSBFluxDaemon];

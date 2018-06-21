@@ -13,6 +13,7 @@
 		0430E93F20BEF9F10047F28C /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 0430E93E20BEF9F10047F28C /* main.m */; };
 		0430E95220C00CA30047F28C /* AuthIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 0430E95120C00CA30047F28C /* AuthIcon.png */; };
 		0430E95420C02E5B0047F28C /* usbfluxd in Resources */ = {isa = PBXBuildFile; fileRef = 0430E95320C02E5B0047F28C /* usbfluxd */; };
+		047357A420DB2A9F0089445A /* terminate.sh in Resources */ = {isa = PBXBuildFile; fileRef = 047357A320DB2A9F0089445A /* terminate.sh */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		0430E94020BEF9F10047F28C /* USBFlux.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = USBFlux.entitlements; sourceTree = "<group>"; };
 		0430E95120C00CA30047F28C /* AuthIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AuthIcon.png; sourceTree = "<group>"; };
 		0430E95320C02E5B0047F28C /* usbfluxd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = usbfluxd; path = ../src/usbfluxd; sourceTree = "<group>"; };
+		047357A320DB2A9F0089445A /* terminate.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; name = terminate.sh; path = USBFlux/terminate.sh; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +44,7 @@
 		0430E92920BEF9F00047F28C = {
 			isa = PBXGroup;
 			children = (
+				047357A320DB2A9F0089445A /* terminate.sh */,
 				0430E95320C02E5B0047F28C /* usbfluxd */,
 				0430E93420BEF9F00047F28C /* USBFlux */,
 				0430E93320BEF9F00047F28C /* Products */,
@@ -137,6 +140,7 @@
 				0430E95220C00CA30047F28C /* AuthIcon.png in Resources */,
 				0430E93C20BEF9F10047F28C /* MainMenu.xib in Resources */,
 				0430E95420C02E5B0047F28C /* usbfluxd in Resources */,
+				047357A420DB2A9F0089445A /* terminate.sh in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
