@@ -506,4 +506,8 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     return NO;
 }
 
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)theApplication
+{
+    return YES;
+}
 @end
