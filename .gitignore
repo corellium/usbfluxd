@@ -34,3 +34,10 @@ py-compile
 stamp-h1
 src/.libs
 src/usbfluxd
+USBFlux/build
+USBFlux/USBFlux.xcodeproj/project.xcworkspace/xcshareddata/
+USBFlux/USBFlux.xcodeproj/project.xcworkspace/xcuserdata/
+USBFlux/USBFlux.xcodeproj/xcuserdata/
+*.zip
+*.dmg
+create-dmg

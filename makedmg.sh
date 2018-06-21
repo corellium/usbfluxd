@@ -19,40 +19,25 @@ xcodebuild clean build
 
 cd "$THISDIR"
 
-#SRCDIR="/tmp/dmgsrc"
-#rm -rf ${SRCDIR}
-#mkdir -p ${SRCDIR}
-#cp -a "${BUILDDIR}/USBFlux.app" ${SRCDIR}/
-#ln -s /Applications ${SRCDIR}/Applications
-MNT="/tmp/dmgmnt"
-rm -rf ${MNT}
-rm -f $PKGNAME-$COMMIT.dmg
-rm -f temp.dmg
-#
-bunzip2 -k -c USBFlux/template.dmg.bz2 > temp.dmg
-#
-#cp ${BUILDDIR}/USBFlux.app/Contents/Resources/AppIcon.icns ${SRCDIR}/.VolumeIcon.icns
-#mkdir -p ${SRCDIR}/.background
-#cp USBFlux/DS_Store ${SRCDIR}/.DS_Store
-#cp USBFlux/background.png ${SRCDIR}/.background/
-#SetFile -c icnC "${SRCDIR}/.VolumeIcon.icns"
-#SIZE=`du -sk $SRCDIR |cut -f 1`
-#SIZE=`echo $SIZE+512 |bc`
-#hdiutil create -srcfolder "${SRCDIR}" -volname "USBFlux" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDRW -size ${SIZE}k temp.dmg
-mkdir -p ${MNT}
-hdiutil attach temp.dmg -mountpoint ${MNT}
-#
-cp -a "${BUILDDIR}/USBFlux.app" ${MNT}/
-ln -sf /Applications "${MNT}/ "
-mkdir -p ${MNT}/.background
-cp USBFlux/background.png ${MNT}/.background/
-cp ${BUILDDIR}/USBFlux.app/Contents/Resources/AppIcon.icns ${MNT}/.VolumeIcon.icns
-SetFile -c icnC "${MNT}/.VolumeIcon.icns"
-#
-SetFile -a C ${MNT}
-hdiutil detach ${MNT}
-rm -rf ${MNT}
+SRCDIR="/tmp/dmgsrc"
 rm -rf ${SRCDIR}
-hdiutil convert temp.dmg -format UDBZ -o $PKGNAME-$COMMIT.dmg
-rm -f temp.dmg
+mkdir -p ${SRCDIR}
+cp -a "${BUILDDIR}/USBFlux.app" ${SRCDIR}/
+ln -s /Applications "${SRCDIR}/ "
+
+rm -f $PKGNAME-$COMMIT.dmg
+
+if ! test -x create-dmg/create-dmg; then
+	rm -rf create-dmg
+	curl -L https://github.com/nikias/create-dmg/archive/master.zip > create-dmg.zip
+	unzip create-dmg.zip
+	mv create-dmg-master create-dmg
+	rm -f create-dmg.zip
+	chmod 755 create-dmg/create-dmg
+	cd "$THISDIR"
+fi
+
+./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon ${BUILDDIR}/USBFlux.app/Contents/Resources/AppIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 $PKGNAME-$COMMIT.dmg ${SRCDIR}
+
+rm -rf ${SRCDIR}
 
