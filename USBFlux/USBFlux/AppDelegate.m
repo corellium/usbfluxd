@@ -29,6 +29,7 @@ static BOOL wasRunning = YES;
 @property (weak) IBOutlet NSTextField *detailLabel;
 @property (weak) IBOutlet NSWindow *window;
 @property (weak) IBOutlet NSButton *startStopButton;
+@property (weak) IBOutlet NSButton *cbAutoStart;
 @end
 
 struct usbmuxd_header {
@@ -449,6 +450,8 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         self.startStopButton.tag = 1;
         if (!wasRunning) {
             self.startStopButton.enabled = YES;
+            [self.window makeFirstResponder:self.startStopButton];
+            self.cbAutoStart.focusRingType = NSFocusRingTypeDefault;
         }
         int local_devices = 0;
         int local_count = 0;
@@ -477,6 +480,8 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         self.startStopButton.tag = 0;
         if (wasRunning) {
             self.startStopButton.enabled = YES;
+            [self.window makeFirstResponder:self.startStopButton];
+            self.cbAutoStart.focusRingType = NSFocusRingTypeDefault;
         }
         self.detailLabel.hidden = YES;
         wasRunning = NO;
@@ -486,6 +491,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
     [[NSApp mainWindow] setDelegate:self];
+    self.cbAutoStart.focusRingType = NSFocusRingTypeNone;
     NSString *usbfluxdPath = [[NSBundle mainBundle] pathForResource:@"usbfluxd" ofType:nil];
     if (![[NSFileManager defaultManager] fileExistsAtPath:usbfluxdPath]) {
         usbfluxd_path = NULL;
@@ -513,6 +519,17 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     if (usbfluxd_path && terminate_path) {
         [self checkStatus:nil];
         checkTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(checkStatus:) userInfo:nil repeats:YES];
+
+        CFPreferencesAppSynchronize(CFSTR("com.corellium.USBFlux"));
+        Boolean existsAndValid = NO;
+        Boolean shouldAutoStart = CFPreferencesGetAppBooleanValue(CFSTR("AutoStart"), CFSTR("com.corellium.USBFlux"), &existsAndValid);
+        if (existsAndValid && shouldAutoStart) {
+            self.cbAutoStart.state = NSControlStateValueOn;
+            if (![self isRunning]) {
+                self.startStopButton.enabled = NO;
+                [NSThread detachNewThreadSelector:@selector(startUSBFluxDaemon) toTarget:self withObject:nil];
+            }
+        }
     }
 }
 
@@ -547,6 +564,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 -(IBAction)startStopClicked:(NSButton*)control
 {
     self.startStopButton.enabled = NO;
+    self.cbAutoStart.focusRingType = NSFocusRingTypeNone;
     if (self.startStopButton.tag == 1) {
         [NSThread detachNewThreadSelector:@selector(stopUSBFluxDaemon) toTarget:self withObject:nil];
     } else {
@@ -563,5 +581,11 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)theApplication
 {
     return YES;
+}
+
+-(IBAction)autoStartClicked:(id)sender
+{
+    CFPreferencesSetAppValue(CFSTR("AutoStart"), (self.cbAutoStart.state == NSControlStateValueOn) ? kCFBooleanTrue : kCFBooleanFalse, CFSTR("com.corellium.USBFlux"));
+    CFPreferencesAppSynchronize(CFSTR("com.corellium.USBFlux"));
 }
 @end

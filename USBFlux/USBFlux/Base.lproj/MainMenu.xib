@@ -15,6 +15,7 @@
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
         <customObject id="Voe-Tx-rLC" customClass="AppDelegate">
             <connections>
+                <outlet property="cbAutoStart" destination="DC0-ve-vRy" id="kmJ-Gp-5NA"/>
                 <outlet property="detailLabel" destination="5Se-ij-0GJ" id="vGc-WC-8YA"/>
                 <outlet property="startStopButton" destination="EbE-RI-n4V" id="hQy-QU-vm2"/>
                 <outlet property="statusLabel" destination="o7e-6J-Rtn" id="Pl7-Z0-T32"/>
@@ -73,14 +74,14 @@
         </menu>
         <window title="USBFlux" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" releasedWhenClosed="NO" animationBehavior="default" id="QvC-M9-y7g">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES"/>
-            <rect key="contentRect" x="335" y="390" width="354" height="148"/>
+            <rect key="contentRect" x="335" y="390" width="354" height="160"/>
             <rect key="screenRect" x="0.0" y="0.0" width="3440" height="1417"/>
             <view key="contentView" wantsLayer="YES" id="EiT-Mj-1SZ">
-                <rect key="frame" x="0.0" y="0.0" width="354" height="148"/>
+                <rect key="frame" x="0.0" y="0.0" width="354" height="160"/>
                 <autoresizingMask key="autoresizingMask"/>
                 <subviews>
                     <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="o7e-6J-Rtn">
-                        <rect key="frame" x="102" y="111" width="150" height="17"/>
+                        <rect key="frame" x="102" y="123" width="150" height="17"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="center" title="USBFlux is not running." id="Nup-gX-6Vi">
                             <font key="font" metaFont="system"/>
@@ -98,7 +99,7 @@
                         </textFieldCell>
                     </textField>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="EbE-RI-n4V">
-                        <rect key="frame" x="115" y="69" width="125" height="32"/>
+                        <rect key="frame" x="115" y="87" width="125" height="32"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="push" title="Start USBFlux" bezelStyle="rounded" alignment="center" enabled="NO" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="tt5-2Q-75b">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -108,12 +109,23 @@
                             <action selector="startStopClicked:" target="Voe-Tx-rLC" id="ggg-oZ-1xi"/>
                         </connections>
                     </button>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="DC0-ve-vRy">
+                        <rect key="frame" x="78" y="67" width="199" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Start automatically on launch" bezelStyle="regularSquare" imagePosition="left" inset="2" id="WY7-F9-BkL">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="autoStartClicked:" target="Voe-Tx-rLC" id="o2K-rn-RuE"/>
+                        </connections>
+                    </button>
                 </subviews>
             </view>
             <connections>
                 <outlet property="delegate" destination="Voe-Tx-rLC" id="6vS-AJ-tsF"/>
             </connections>
-            <point key="canvasLocation" x="76" y="130"/>
+            <point key="canvasLocation" x="76" y="136"/>
         </window>
     </objects>
 </document>
