@@ -37,7 +37,7 @@ if ! test -x create-dmg/create-dmg; then
 	cd "$THISDIR"
 fi
 
-./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon ${BUILDDIR}/USBFlux.app/Contents/Resources/AppIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 $PKGNAME-$COMMIT.dmg ${SRCDIR}
+./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 $PKGNAME-$COMMIT.dmg ${SRCDIR}
 
 rm -rf ${SRCDIR}
 
