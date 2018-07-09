@@ -663,6 +663,83 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					if (send_instances(client, hdr->tag) < 0)
 						return -1;
 					return 0;
+				} else if (!strcmp(message, "AddInstance")) {
+					free(message);
+					char* hostaddr = plist_dict_get_string_val(dict, "HostAddress");
+					if (!hostaddr) {
+						usbfluxd_log(LL_ERROR, "Received AddInstance request without host address!");
+						plist_free(dict);
+						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+							return -1;
+						return 0;
+					}
+					uint64_t val;
+					uint16_t portnum = 0;
+					node = plist_dict_get_item(dict, "PortNumber");
+					if (!node) {
+						usbfluxd_log(LL_ERROR, "Received AddInstance request without port number!");
+						plist_free(dict);
+						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+							return -1;
+						return 0;
+					}
+					val = 0;
+					plist_get_uint_val(node, &val);
+					portnum = (uint16_t)val;
+
+					int rv = usbmux_remote_add_remote(hostaddr, portnum);
+					if (rv < 0) {
+						int rc = RESULT_CONNREFUSED;
+						if (rv == -2) {
+							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u (already present)\n", hostaddr, portnum);
+							rc = RESULT_BADDEV;
+						} else {
+							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u\n", hostaddr, portnum);
+						}
+						free(hostaddr);
+						if (send_result(client, hdr->tag, rc) < 0)
+							return -1;
+						return 0;
+					}
+					free(hostaddr);
+					if (send_result(client, hdr->tag, RESULT_OK) < 0)
+						return -1;
+					return 0;
+				} else if (!strcmp(message, "RemoveInstance")) {
+					free(message);
+					char* hostaddr = plist_dict_get_string_val(dict, "HostAddress");
+					if (!hostaddr) {
+						usbfluxd_log(LL_ERROR, "Received RemoveInstance request without host address!");
+						plist_free(dict);
+						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+							return -1;
+						return 0;
+					}
+					uint64_t val;
+					uint16_t portnum = 0;
+					node = plist_dict_get_item(dict, "PortNumber");
+					if (!node) {
+						usbfluxd_log(LL_ERROR, "Received RemoveInstance request without port number!");
+						plist_free(dict);
+						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+							return -1;
+						return 0;
+					}
+					val = 0;
+					plist_get_uint_val(node, &val);
+					portnum = (uint16_t)val;
+
+					if (usbmux_remote_remove_remote(hostaddr, portnum) < 0) {
+						usbfluxd_log(LL_ERROR, "Failed to remove remote %s:%u\n", hostaddr, portnum);
+						free(hostaddr);
+						if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
+							return -1;
+						return 0;
+					}
+					free(hostaddr);
+					if (send_result(client, hdr->tag, RESULT_OK) < 0)
+						return -1;
+					return 0;
 				} else {
 					usbfluxd_log(LL_ERROR, "Unexpected command '%s' received!", message);
 					free(message);

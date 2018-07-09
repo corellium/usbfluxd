@@ -85,5 +85,6 @@ void usbmux_remote_get_fds(struct fdlist *list);
 void usbmux_remote_process(int fd, short events);
 
 int usbmux_remote_add_remote(const char *host_name, uint16_t port);
+int usbmux_remote_remove_remote(const char *host_name, uint16_t port);
 
 #endif

@@ -576,6 +576,20 @@ monitor_thread_cleanup:
 int usbmux_remote_add_remote(const char *host_name, uint16_t port)
 {
 	int res = -1;
+
+	pthread_mutex_lock(&remote_list_mutex);
+	FOREACH(struct remote_mux *remote, &remote_list) {
+		if (!remote->is_unix && (strcmp(remote->host, host_name) == 0) && (remote->port == port)) {
+			res = 0;
+			break;
+		}
+	} ENDFOREACH
+	pthread_mutex_unlock(&remote_list_mutex);
+
+	if (res == 0) {
+		return -2;
+	}
+
 	struct remote_mux *remote = remote_mux_new_with_host(host_name, port);
 	if (remote) {
 		pthread_mutex_lock(&remote_list_mutex);
@@ -588,6 +602,21 @@ int usbmux_remote_add_remote(const char *host_name, uint16_t port)
 		pthread_mutex_unlock(&remote_list_mutex);
 		res = 0;
 	}
+	return res;
+}
+
+int usbmux_remote_remove_remote(const char *host_name, uint16_t port)
+{
+	int res = -1;
+	pthread_mutex_lock(&remote_list_mutex);
+	FOREACH(struct remote_mux *remote, &remote_list) {
+		if (!remote->is_unix && (strcmp(remote->host, host_name) == 0) && (remote->port == port)) {
+			usbmux_remote_dispose(remote);
+			res = 0;
+			break;
+		}
+	} ENDFOREACH
+	pthread_mutex_unlock(&remote_list_mutex);
 	return res;
 }
 
