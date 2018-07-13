@@ -56,6 +56,7 @@ static int verbose = 1;
 static int foreground = 0;
 static int daemon_pipe;
 static int renamed = 0;
+static int opt_no_usbmuxd = 0;
 
 static char *remote_host = NULL;
 static uint16_t remote_port = 0;
@@ -274,6 +275,7 @@ static void usage()
 	printf("  -h, --help\t\tPrint this message.\n");
 	printf("  -v, --verbose\t\tBe verbose (use twice or more to increase).\n");
 	printf("  -f, --foreground\tDo not daemonize (implies one -v).\n");
+	printf("  -n, --no-usbmuxd\tRun even if local usbmuxd is not available.\n");
 	printf("  -V, --version\t\tPrint version information and exit.\n");
 	printf("\n");
 }
@@ -286,11 +288,12 @@ static void parse_opts(int argc, char **argv)
 		{"verbose", 0, NULL, 'v'},
 		{"version", 0, NULL, 'V'},
 		{"remote", required_argument, NULL, 'r'},
+		{"no-usbmuxd", 0, NULL, 'n'},
 		{NULL, 0, NULL, 0}
 	};
 	int c;
 
-	const char* opts_spec = "hfvVr:";
+	const char* opts_spec = "hfvVr:n";
 
 	while (1) {
 		c = getopt_long(argc, argv, opts_spec, longopts, (int *) 0);
@@ -311,6 +314,9 @@ static void parse_opts(int argc, char **argv)
 		case 'V':
 			printf("%s\n", PACKAGE_STRING);
 			exit(0);
+		case 'n':
+			opt_no_usbmuxd = 1;
+			break;
 		case 'r': {
 			char *colon = strchr(optarg, ':');
 			if (colon) {
@@ -379,6 +385,7 @@ int main(int argc, char *argv[])
 			testfd = socket_connect_unix(USBMUXD_SOCKET_FILE);
 			if (testfd < 0) {
 				/* connection not possible, this should be OK */
+				opt_no_usbmuxd = 0;
 			} else {
 				socket_close(testfd);
 				usbfluxd_log(LL_FATAL, "Socket file '%s' is already present and seems to be in use. This might be due to another usbfluxd instance running or the original usbmuxd was restarted. Refusing to continue.", USBMUXD_SOCKET_FILE);
@@ -392,19 +399,27 @@ int main(int argc, char *argv[])
 		if (access(USBMUXD_SOCKET_FILE, R_OK | W_OK) == 0) {
 			int testfd = socket_connect_unix(USBMUXD_SOCKET_FILE);
 			if (testfd < 0) {
-				usbfluxd_log(LL_FATAL, "Socket file '%s' is present but unused. Original usbmuxd is not running. Exiting.", USBMUXD_SOCKET_FILE);
-				goto terminate;
+				if (opt_no_usbmuxd) {
+					usbfluxd_log(LL_NOTICE, "Socket file '%s' is present but unused. Original usbmuxd is not running. Continuing anyway.", USBMUXD_SOCKET_FILE);
+				} else {
+					usbfluxd_log(LL_FATAL, "Socket file '%s' is present but unused. Original usbmuxd is not running. Exiting.", USBMUXD_SOCKET_FILE);
+					goto terminate;
+				}
 			} else {
 				socket_close(testfd);
-				
+				opt_no_usbmuxd = 0;
 			}
 		} else {
-			usbfluxd_log(LL_FATAL, "Socket file '%s' is not present. Original usbmuxd is not running or absent. Exiting.", USBMUXD_SOCKET_FILE);
-			goto terminate;
+			if (opt_no_usbmuxd) {
+				usbfluxd_log(LL_NOTICE, "Socket file '%s' is not present. Original usbmuxd is not running or absent. Continuing anyway.", USBMUXD_SOCKET_FILE);
+			} else {
+				usbfluxd_log(LL_FATAL, "Socket file '%s' is not present. Original usbmuxd is not running or absent. Exiting.", USBMUXD_SOCKET_FILE);
+				goto terminate;
+			}
 		}
 	}
 
-	if (!renamed) {
+	if (!renamed && !opt_no_usbmuxd) {
 		/* rename the original usbmuxd socket */
 		if (rename(USBMUXD_SOCKET_FILE, USBMUXD_RENAMED_SOCKET) != 0) {
 			usbfluxd_log(LL_FATAL, "FATAL: Could not rename usbmuxd socket file: %s. Exiting.", strerror(errno));
