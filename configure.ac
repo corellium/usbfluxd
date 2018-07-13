@@ -73,7 +73,7 @@ AC_ARG_WITH([static-libplist],
             [with_static_libplist=no])
 if test "x$with_static_libplist" != "xno"; then
   if test "x$with_static_libplist" = "xyes"; then
-    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist |sed 's/^..//'`/libplist.a"
+    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist |sed 's/^..//; s/[ ]*$/\/libplist.a/'`"
   else
     STATIC_LIBPLIST="$with_static_libplist"
   fi
