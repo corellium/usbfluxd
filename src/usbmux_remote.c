@@ -55,7 +55,29 @@
 static struct collection remote_list;
 pthread_mutex_t remote_list_mutex;
 static plist_t remote_device_list = NULL;
-static uint8_t remote_id = 1;
+static uint8_t remote_id_map[32];
+
+static void set_remote_id_used(uint8_t idval, int used)
+{
+	if (used) {
+		remote_id_map[idval >> 3] |= (1 << (idval & 7));
+	} else {
+		remote_id_map[idval >> 3] &= ~(1 << (idval & 7));
+	}
+}
+
+static uint8_t get_new_remote_id()
+{
+	unsigned int i = 0;
+	uint8_t use_id = 0;
+	for (i = 1; i < 256; i++) {
+		if (!(remote_id_map[i >> 3] & (1 << (i & 7)))) {
+			use_id = i;
+			break;
+		}
+	}
+	return use_id;
+}
 
 /* {{{ plist helper */
 typedef int (*plist_dict_foreach_func_t)(const char *key, plist_t value, void *context);
@@ -475,10 +497,22 @@ static int remote_mux_service_add(const char *service_name, const char *host_nam
 	remote = remote_mux_new_with_host(host_name, port);
 	if (remote) {
 		pthread_mutex_lock(&remote_list_mutex);
-		remote->id = remote_id++;
+		uint8_t new_remote_id = get_new_remote_id();
+		if (new_remote_id == 0) {
+			usbfluxd_log(LL_ERROR, "%s: Too many remotes. Release others before adding more.", __func__);
+			close(remote->fd);
+			free(remote->host);
+			free(remote->ob_buf);
+			free(remote->ib_buf);
+			free(remote);
+			return res;
+		}
+		usbfluxd_log(LL_NOTICE, "%s: new remote id: %d", __func__, new_remote_id);
+		remote->id = new_remote_id;
 		remote->service_name = strdup(service_name);
 		remote->is_listener = 1;
 		collection_add(&remote_list, remote);
+		set_remote_id_used(new_remote_id, 1);
 		remote_send_listen_packet(remote);
 		pthread_mutex_unlock(&remote_list_mutex);
 		res = 0;
@@ -734,6 +768,7 @@ void usbmux_remote_init(void)
 	collection_init(&remote_list);
 	pthread_mutex_init(&remote_list_mutex, NULL);
 	remote_device_list = plist_new_dict();
+	memset(&remote_id_map, '\0', sizeof(remote_id_map));
 
 	struct remote_mux *remote = remote_mux_new_with_unix_socket(USBMUXD_RENAMED_SOCKET);
 	if (remote) {
@@ -741,6 +776,7 @@ void usbmux_remote_init(void)
 		remote->id = 0;
 		remote->is_listener = 1;
 		collection_add(&remote_list, remote);
+		set_remote_id_used(0, 1);
 		remote_send_listen_packet(remote);
 		pthread_mutex_unlock(&remote_list_mutex);
 	}
@@ -830,6 +866,7 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 
 	if (remote->is_listener && remote->host) {
 		usbfluxd_log(LL_NOTICE, "NOTE: remote %s:%d is no longer available.", remote->host, remote->port);
+		set_remote_id_used(remote->id, 0);
 	}
 
 	free(remote->host);
