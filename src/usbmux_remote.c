@@ -23,10 +23,12 @@
 
 #define _GNU_SOURCE 1
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <pthread.h>
 
@@ -545,7 +547,7 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 }
 #endif
 
-void *mdns_monitor_thread(void *user_data)
+static void *mdns_monitor_thread(void *user_data)
 {
 #ifdef HAVE_CFNETWORK
 	CFNetServiceClientContext cctx = {0, user_data, NULL, NULL, NULL};
@@ -760,7 +762,7 @@ plist_t usbmux_remote_get_device_list()
 }
 
 struct remote_inst_info {
-	int id;
+	uint8_t id;
 	plist_t array;
 };
 
