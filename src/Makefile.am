@@ -1,7 +1,7 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)
 
-AM_CFLAGS = $(GLOBAL_CFLAGS) $(libplist_CFLAGS) $(libusb_CFLAGS) $(libimobildevice_CFLAGS)
-AM_LDFLAGS = $(libplist_LIBS) $(libusb_LIBS) $(libimobiledevice_LIBS) $(libpthread_LIBS) $(AC_LDADD)
+AM_CFLAGS = $(GLOBAL_CFLAGS) $(libplist_CFLAGS) $(avahi_client_CFLAGS)
+AM_LDFLAGS = $(libplist_LIBS) $(libpthread_LIBS) $(avahi_client_LIBS) $(AC_LDADD)
 
 sbin_PROGRAMS = usbfluxd
 

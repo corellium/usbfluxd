@@ -36,6 +36,14 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CFNetwork/CFNetServices.h>
 #endif
+#ifdef HAVE_AVAHI_CLIENT
+#include <avahi-client/client.h>
+#include <avahi-client/lookup.h>
+#include <avahi-common/simple-watch.h>
+#include <avahi-common/malloc.h>
+#include <avahi-common/error.h>
+#include <assert.h>
+#endif
 
 #include "usbmux_remote.h"
 #include "utils.h"
@@ -575,6 +583,71 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 	}
 }
 #endif
+#ifdef HAVE_AVAHI_CLIENT
+static AvahiSimplePoll *simple_poll = NULL;
+static pthread_t th_mdns_mon;
+
+static void service_resolve_cb(AvahiServiceResolver *r, AVAHI_GCC_UNUSED AvahiIfIndex interface, AVAHI_GCC_UNUSED AvahiProtocol protocol, AvahiResolverEvent event, const char *service_name, const char *type, const char *domain, const char *host_name, const AvahiAddress *address, uint16_t port, AvahiStringList *txt, AvahiLookupResultFlags flags, AVAHI_GCC_UNUSED void* userdata)
+{
+	assert(r);
+	switch (event) {
+		case AVAHI_RESOLVER_FAILURE:
+			usbfluxd_log(LL_ERROR, "[avahi] Failed to resolve service '%s' of type '%s' in domain '%s': %s", service_name, type, domain, avahi_strerror(avahi_client_errno(avahi_service_resolver_get_client(r))));
+			break;
+		case AVAHI_RESOLVER_FOUND: {
+			int res = remote_mux_service_add(service_name, host_name, port);
+			if (res == 0) {
+				usbfluxd_log(LL_NOTICE, "%s: Added service %s", __func__, service_name);
+			} else if (res == -2) {
+				usbfluxd_log(LL_DEBUG, "%s: Remote service %s (%s:%d) is already present. Not adding.", __func__, service_name, host_name, port);
+			} else {
+				usbfluxd_log(LL_ERROR, "%s: Failed to add remote service %s (%s:%d)", __func__, service_name, host_name, port);
+			}
+			break; }
+		default:
+			break;
+	}
+	avahi_service_resolver_free(r);
+}
+
+static void service_browse_cb(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *service_name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags, void* userdata)
+{
+	AvahiClient *c = userdata;
+	assert(b);
+
+	switch (event) {
+		case AVAHI_BROWSER_FAILURE:
+			usbfluxd_log(LL_ERROR, "[avahi] ERROR: %s", avahi_strerror(avahi_client_errno(avahi_service_browser_get_client(b))));
+			avahi_simple_poll_quit(simple_poll);
+			return;
+		case AVAHI_BROWSER_NEW:
+			usbfluxd_log(LL_DEBUG, "[avahi] NEW: service '%s' of type '%s' in domain '%s'", service_name, type, domain);
+			if (!(avahi_service_resolver_new(c, interface, protocol, service_name, type, domain, AVAHI_PROTO_UNSPEC, 0, service_resolve_cb, c)))
+				usbfluxd_log(LL_ERROR, "[avahi] Failed to resolve service '%s': %s", service_name, avahi_strerror(avahi_client_errno(c)));
+			break;
+		case AVAHI_BROWSER_REMOVE: {
+			usbfluxd_log(LL_DEBUG, "[avahi] REMOVE: service '%s' of type '%s' in domain '%s'", service_name, type, domain);
+			int res = remote_mux_service_remove(service_name, NULL, 0);
+			usbfluxd_log(LL_NOTICE, "%s: Removed service %s (%d)", __func__, service_name, res);
+			break; }
+		case AVAHI_BROWSER_ALL_FOR_NOW:
+		case AVAHI_BROWSER_CACHE_EXHAUSTED:
+			usbfluxd_log(LL_DEBUG, "[avahi] Browser: %s", event == AVAHI_BROWSER_CACHE_EXHAUSTED ? "CACHE_EXHAUSTED" : "ALL_FOR_NOW");
+			break;
+		default:
+			break;
+	}
+}
+
+static void client_cb(AvahiClient *c, AvahiClientState state, AVAHI_GCC_UNUSED void * userdata)
+{
+	assert(c);
+	if (state == AVAHI_CLIENT_FAILURE) {
+		usbfluxd_log(LL_ERROR, "[avahi] Server connection failure: %s", avahi_strerror(avahi_client_errno(c)));
+		avahi_simple_poll_quit(simple_poll);
+	}
+}
+#endif
 
 static void *mdns_monitor_thread(void *user_data)
 {
@@ -593,6 +666,30 @@ static void *mdns_monitor_thread(void *user_data)
 	}
 	CFNetServiceBrowserInvalidate(browser);	
 #endif
+#ifdef HAVE_AVAHI_CLIENT
+	AvahiClient *client = NULL;
+	AvahiServiceBrowser *sb = NULL;
+	int error = -1;
+
+	if (!(simple_poll = avahi_simple_poll_new())) {
+		usbfluxd_log(LL_ERROR, "Failed to create avahi simple poll object.");
+		goto monitor_thread_cleanup;
+	}
+
+	client = avahi_client_new(avahi_simple_poll_get(simple_poll), 0, client_cb, NULL, &error);
+	if (!client) {
+		usbfluxd_log(LL_ERROR, "Failed to create avahi client: %s", avahi_strerror(error));
+		goto monitor_thread_cleanup;
+	}
+
+	sb = avahi_service_browser_new(client, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, "_remote-mobdev._tcp", NULL, 0, service_browse_cb, client);
+	if (!sb) {
+		usbfluxd_log(LL_ERROR, "Failed to create avahi service browser: %s", avahi_strerror(avahi_client_errno(client)));
+		goto monitor_thread_cleanup;
+	}
+
+	avahi_simple_poll_loop(simple_poll);
+#endif
 
 monitor_thread_cleanup:
 #ifdef HAVE_CFNETWORK
@@ -600,7 +697,15 @@ monitor_thread_cleanup:
 		CFRelease(browser);
 	service_browser = NULL;
 #endif
-
+#ifdef HAVE_AVAHI_CLIENT
+	if (sb)
+		avahi_service_browser_free(sb);
+	if (client)
+		avahi_client_free(client);
+	if (simple_poll)
+		avahi_simple_poll_free(simple_poll);
+	simple_poll = NULL;
+#endif
 	return NULL;
 }
 
@@ -650,6 +755,12 @@ void usbmux_remote_shutdown(void)
 #ifdef HAVE_CFNETWORK
 	CFStreamError err;
 	CFNetServiceBrowserStopSearch(service_browser, &err);
+	pthread_join(th_mdns_mon, NULL);
+#endif
+#ifdef HAVE_AVAHI_CLIENT
+	if (simple_poll) {
+		avahi_simple_poll_quit(simple_poll);
+	}
 	pthread_join(th_mdns_mon, NULL);
 #endif
 	pthread_mutex_lock(&remote_list_mutex);

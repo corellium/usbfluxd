@@ -57,6 +57,10 @@ case ${host_os} in
   *)
     win32=false
     AC_MSG_RESULT([no])
+    PKG_CHECK_MODULES(avahi_client, avahi-client >= 0.6.32, have_avahi=yes, have_avahi=no)
+    if test "x$have_avahi" = "xyes"; then
+      AC_DEFINE(HAVE_AVAHI_CLIENT, 1, [Define to enable avahi-client support])
+    fi
     ;;
 esac
 AC_SUBST(AC_LDADD)
