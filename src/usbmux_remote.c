@@ -451,6 +451,51 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 	return -1;
 }
 
+static int remote_mux_service_add(const char *service_name, const char *host_name, uint16_t port)
+{
+	int res = -1;
+	struct remote_mux *remote = NULL;
+	FOREACH(struct remote_mux *r, &remote_list) {
+		if (!r->is_unix && ((strcmp(r->service_name, service_name) == 0) || ((strcmp(r->host, host_name) == 0) && (r->port == port)))) {
+			remote = r;
+			break;
+		}
+	} ENDFOREACH
+	if (remote) {
+		return -2;
+	}
+	remote = remote_mux_new_with_host(host_name, port);
+	if (remote) {
+		pthread_mutex_lock(&remote_list_mutex);
+		remote->id = remote_id++;
+		remote->service_name = strdup(service_name);
+		remote->is_listener = 1;
+		collection_add(&remote_list, remote);
+		remote_send_listen_packet(remote);
+		pthread_mutex_unlock(&remote_list_mutex);
+		res = 0;
+	}
+	return res;
+}
+
+static int remote_mux_service_remove(const char *service_name, const char *host_name, uint16_t port)
+{
+	int res = -1;
+	pthread_mutex_lock(&remote_list_mutex);
+	struct remote_mux *remote = NULL;
+	FOREACH(struct remote_mux *r, &remote_list) {
+		if (!r->is_unix && ((service_name && (strcmp(r->service_name, service_name) == 0)) || (host_name && (strcmp(r->host, host_name) == 0) && (r->port == port)))) {
+			remote = r;
+			break;
+		}
+	} ENDFOREACH
+	if (remote) {
+		usbmux_remote_dispose(remote);
+		res = 0;
+	}
+	pthread_mutex_unlock(&remote_list_mutex);
+	return res;
+}
 
 #ifdef HAVE_CFNETWORK
 static CFNetServiceBrowserRef service_browser = NULL;
@@ -484,19 +529,8 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 				}
 				service_name[0] = '\0';
 				CFStringGetCString(cf_service, service_name, len+1, kCFStringEncodingASCII);
-				pthread_mutex_lock(&remote_list_mutex);
-				struct remote_mux *remote = NULL;
-				FOREACH(struct remote_mux *r, &remote_list) {
-					if (r->service_name && (strcmp(r->service_name, service_name) == 0)) {
-						remote = r;
-						break;
-					}
-				} ENDFOREACH
-				if (remote) {
-					usbmux_remote_dispose(remote);
-				}
-				usbfluxd_log(LL_NOTICE, "%s: Removed service %s", __func__, service_name);
-				pthread_mutex_unlock(&remote_list_mutex);
+				int res = remote_mux_service_remove(service_name, NULL, 0);
+				usbfluxd_log(LL_NOTICE, "%s: Removed service %s (%d)", __func__, service_name, res);
 				free(service_name);
 			}
 		} else {
@@ -526,18 +560,13 @@ static void service_browse_cb(CFNetServiceBrowserRef browser, CFOptionFlags flag
 				}
 				service_name[0] = '\0';
 				CFStringGetCString(cf_service, service_name, len+1, kCFStringEncodingASCII);
-
-				struct remote_mux *remote = remote_mux_new_with_host(host_name, port);
-				if (remote) {
-					pthread_mutex_lock(&remote_list_mutex);
-					remote->id = remote_id++;
-					remote->service_name = service_name;
-					remote->is_listener = 1;
+				int res = remote_mux_service_add(service_name, host_name, port);
+				if (res == 0) {
 					usbfluxd_log(LL_NOTICE, "%s: Added service %s", __func__, service_name);
-					service_name = NULL;
-					collection_add(&remote_list, remote);
-					remote_send_listen_packet(remote);
-					pthread_mutex_unlock(&remote_list_mutex);
+				} else if (res == -2) {
+					usbfluxd_log(LL_DEBUG, "%s: Remote service %s is already present.", __func__, service_name);
+				} else {
+					usbfluxd_log(LL_ERROR, "%s: Failed to add remote service %s (%s:%d)", __func__, service_name, host_name, port);
 				}
 				free(service_name);
 				free(host_name);
@@ -577,48 +606,19 @@ monitor_thread_cleanup:
 
 int usbmux_remote_add_remote(const char *host_name, uint16_t port)
 {
-	int res = -1;
-
-	pthread_mutex_lock(&remote_list_mutex);
-	FOREACH(struct remote_mux *remote, &remote_list) {
-		if (!remote->is_unix && (strcmp(remote->host, host_name) == 0) && (remote->port == port)) {
-			res = 0;
-			break;
-		}
-	} ENDFOREACH
-	pthread_mutex_unlock(&remote_list_mutex);
-
+	int res = remote_mux_service_add(host_name, host_name, port);
 	if (res == 0) {
-		return -2;
-	}
-
-	struct remote_mux *remote = remote_mux_new_with_host(host_name, port);
-	if (remote) {
-		pthread_mutex_lock(&remote_list_mutex);
-		remote->id = remote_id++;
-		remote->is_listener = 1;
-		remote->service_name = strdup(host_name);
 		usbfluxd_log(LL_NOTICE, "Added remote %s:%d", host_name, port);
-		collection_add(&remote_list, remote);
-		remote_send_listen_packet(remote);
-		pthread_mutex_unlock(&remote_list_mutex);
-		res = 0;
 	}
 	return res;
 }
 
 int usbmux_remote_remove_remote(const char *host_name, uint16_t port)
 {
-	int res = -1;
-	pthread_mutex_lock(&remote_list_mutex);
-	FOREACH(struct remote_mux *remote, &remote_list) {
-		if (!remote->is_unix && (strcmp(remote->host, host_name) == 0) && (remote->port == port)) {
-			usbmux_remote_dispose(remote);
-			res = 0;
-			break;
-		}
-	} ENDFOREACH
-	pthread_mutex_unlock(&remote_list_mutex);
+	int res = remote_mux_service_remove(NULL, host_name, port);
+	if (res == 0) {
+		usbfluxd_log(LL_NOTICE, "Removed remote %s:%d", host_name, port);
+	}
 	return res;
 }
 
