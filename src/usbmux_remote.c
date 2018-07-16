@@ -166,19 +166,19 @@ static struct remote_mux* remote_mux_new_with_host(const char *hostname, uint16_
 	return r;
 }
 
-#define PLIST_BUNDLE_ID "org.libimobiledevice.usbmuxd"
-#define PLIST_CLIENT_VERSION_STRING "usbmuxd built for freedom"
-#define PLIST_PROGNAME "usbmuxd"
+#define PLIST_BUNDLE_ID "com.corellium.usbfluxd"
+#define PLIST_PROGNAME "usbfluxd"
+#define PLIST_CLIENT_VERSION_STRING PLIST_PROGNAME " " VERSION
 #define PLIST_LIBUSBMUX_VERSION 3
 
 static plist_t create_plist_message(const char* message_type)
 {
 	plist_t plist = plist_new_dict();
-	//plist_dict_set_item(plist, "BundleID", plist_new_string(PLIST_BUNDLE_ID));
-	//plist_dict_set_item(plist, "ClientVersionString", plist_new_string(PLIST_CLIENT_VERSION_STRING));
+	plist_dict_set_item(plist, "BundleID", plist_new_string(PLIST_BUNDLE_ID));
+	plist_dict_set_item(plist, "ClientVersionString", plist_new_string(PLIST_CLIENT_VERSION_STRING));
 	plist_dict_set_item(plist, "MessageType", plist_new_string(message_type));
-	//plist_dict_set_item(plist, "ProgName", plist_new_string(PLIST_PROGNAME));	
-	//plist_dict_set_item(plist, "kLibUSBMuxVersion", plist_new_uint(PLIST_LIBUSBMUX_VERSION));
+	plist_dict_set_item(plist, "ProgName", plist_new_string(PLIST_PROGNAME));
+	plist_dict_set_item(plist, "kLibUSBMuxVersion", plist_new_uint(PLIST_LIBUSBMUX_VERSION));
 	return plist;
 }
 
