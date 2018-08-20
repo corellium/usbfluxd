@@ -17,7 +17,6 @@
 #include <spawn.h>
 
 static AuthorizationRef authorization = nil;
-static BOOL wasRunning = YES;
 
 @interface AppDelegate ()
 {
@@ -248,7 +247,6 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     [alert setMessageText:@"Missing Permissions"];
     [alert setInformativeText:@"USBFlux cannot be configured without elevated privileges."];
     [alert runModal];
-    wasRunning = !wasRunning;
 }
 
 -(void)configFailAlert
@@ -259,7 +257,6 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     [alert setMessageText:@"Error"];
     [alert setInformativeText:@"Failed to configure USBFlux."];
     [alert runModal];
-    wasRunning = !wasRunning;
 }
 
 -(void)startUSBFluxDaemon
@@ -451,18 +448,13 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         return;
     }
     NSDictionary *instances = [self getInstances];
-    if (!timer) {
-        wasRunning = (instances == nil);
-    }
     if (instances) {
         self.statusLabel.stringValue = @"USBFlux is running.";
         self.startStopButton.title = @"Stop";
         self.startStopButton.tag = 1;
-        if (!wasRunning) {
-            self.startStopButton.enabled = YES;
-            [self.window makeFirstResponder:self.startStopButton];
-            self.cbAutoStart.focusRingType = NSFocusRingTypeDefault;
-        }
+        self.startStopButton.enabled = YES;
+        [self.window makeFirstResponder:self.startStopButton];
+        self.cbAutoStart.focusRingType = NSFocusRingTypeDefault;
         int local_devices = 0;
         int local_count = 0;
         int remote_devices = 0;
@@ -483,18 +475,14 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         }
         self.detailLabel.stringValue = [NSString stringWithFormat:@"%d Instance%s (%d Local / %d Remote)\n%d Device%s (%d Local / %d Remote)", local_count+remote_count,  (local_count+remote_count == 1) ? "" : "s", local_count, remote_count, local_devices+remote_devices, (local_devices+remote_devices == 1) ? "" : "s", local_devices, remote_devices];
         self.detailLabel.hidden = NO;
-        wasRunning = YES;
     } else {
         self.statusLabel.stringValue = @"USBFlux is not running.";
         self.startStopButton.title = @"Start";
         self.startStopButton.tag = 0;
-        if (wasRunning) {
-            self.startStopButton.enabled = YES;
-            [self.window makeFirstResponder:self.startStopButton];
-            self.cbAutoStart.focusRingType = NSFocusRingTypeDefault;
-        }
+        self.startStopButton.enabled = YES;
+        [self.window makeFirstResponder:self.startStopButton];
+        self.cbAutoStart.focusRingType = NSFocusRingTypeDefault;
         self.detailLabel.hidden = YES;
-        wasRunning = NO;
     }
 }
 
