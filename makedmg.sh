@@ -1,6 +1,10 @@
 #!/bin/sh
 
 VER="1.0"
+CONFIG_VERSION=`grep AC_INIT configure.ac |cut -d "[" -f3 |cut -d "]" -f 1`
+if test -n $CONFIG_VERSION; then
+    VER=$CONFIG_VERSION
+fi
 PKGNAME="USBFlux-${VER}"
 BUILDDIR="USBFlux/build/Release"
 
