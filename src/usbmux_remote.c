@@ -876,6 +876,13 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	free(remote);
 }
 
+static void usbmux_remote_dispose_locked(struct remote_mux *remote)
+{
+	pthread_mutex_lock(&remote_list_mutex);
+	usbmux_remote_dispose(remote);
+	pthread_mutex_unlock(&remote_list_mutex);
+}
+
 void usbmux_remote_notify_client_close(struct remote_mux *remote)
 {
 	pthread_mutex_lock(&remote_list_mutex);
@@ -1142,7 +1149,7 @@ static void remote_process_recv(struct remote_mux *remote)
 				usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
 			else
 				usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
-			usbmux_remote_dispose(remote);
+			usbmux_remote_dispose_locked(remote);
 			return;
 		}
 		remote->ib_size += res;
@@ -1153,12 +1160,12 @@ static void remote_process_recv(struct remote_mux *remote)
 	struct usbmuxd_header *hdr = (void*)remote->ib_buf;
 	if (hdr->length > remote->ib_capacity) {
 		usbfluxd_log(LL_INFO, "usbmux %d message is too long (%d bytes)", remote->fd, hdr->length);
-		usbmux_remote_dispose(remote);
+		usbmux_remote_dispose_locked(remote);
 		return;
 	}
 	if (hdr->length < sizeof(struct usbmuxd_header)) {
 		usbfluxd_log(LL_ERROR, "usbmux %d message is too short (%d bytes)", remote->fd, hdr->length);
-		usbmux_remote_dispose(remote);
+		usbmux_remote_dispose_locked(remote);
 		return;
 	}
 	if (remote->ib_size < hdr->length) {
@@ -1167,11 +1174,11 @@ static void remote_process_recv(struct remote_mux *remote)
 		res = recv(remote->fd, remote->ib_buf + remote->ib_size, hdr->length - remote->ib_size, 0);
 		if (res < 0) {
 			usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
-			usbmux_remote_dispose(remote);
+			usbmux_remote_dispose_locked(remote);
 			return;
 		} else if(res == 0) {
 			usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
-			usbmux_remote_dispose(remote);
+			usbmux_remote_dispose_locked(remote);
 			return;
 		}
 		remote->ib_size += res;
