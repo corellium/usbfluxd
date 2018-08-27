@@ -999,6 +999,7 @@ static uint32_t message_get_result(struct usbmuxd_header *hdr, void *payload, ui
 				result = (uint32_t)u64val;
 			}
 		}
+		free(msgtype);
 	}
 	return result;
 }

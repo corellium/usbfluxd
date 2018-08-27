@@ -245,10 +245,9 @@ void client_close(struct mux_client *client)
 	if (client->remote) {
 		usbmux_remote_notify_client_close(client->remote);
 	}
-	if(client->ob_buf)
-		free(client->ob_buf);
-	if(client->ib_buf)
-		free(client->ib_buf);
+	free(client->ob_buf);
+	free(client->ib_buf);
+	plist_free(client->info);
 	pthread_mutex_lock(&client_list_mutex);
 	collection_remove(&client_list, client);
 	pthread_mutex_unlock(&client_list_mutex);
@@ -602,6 +601,7 @@ static void update_client_info(struct mux_client *client, plist_t dict)
 	if (node && (plist_get_node_type(node) == PLIST_STRING)) {
 		plist_get_string_val(node, &strval);
 		plist_dict_set_item(info, "BundleID", plist_new_string(strval));
+		free(strval);
 	}
 
 	strval = NULL;
@@ -609,6 +609,7 @@ static void update_client_info(struct mux_client *client, plist_t dict)
 	if (node && (plist_get_node_type(node) == PLIST_STRING)) {
 		plist_get_string_val(node, &strval);
 		plist_dict_set_item(info, "ClientVersionString", plist_new_string(strval));
+		free(strval);
 	}
 
 	strval = NULL;
@@ -616,6 +617,7 @@ static void update_client_info(struct mux_client *client, plist_t dict)
 	if (node && (plist_get_node_type(node) == PLIST_STRING)) {
 		plist_get_string_val(node, &strval);
 		plist_dict_set_item(info, "ProgName", plist_new_string(strval));
+		free(strval);
 	}
 
 	u64val = 0;
