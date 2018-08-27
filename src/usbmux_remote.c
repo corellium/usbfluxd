@@ -485,6 +485,7 @@ static int remote_mux_service_add(const char *service_name, const char *host_nam
 {
 	int res = -1;
 	struct remote_mux *remote = NULL;
+	pthread_mutex_lock(&remote_list_mutex);
 	FOREACH(struct remote_mux *r, &remote_list) {
 		if (!r->is_unix && ((strcmp(r->service_name, service_name) == 0) || ((strcmp(r->host, host_name) == 0) && (r->port == port)))) {
 			remote = r;
@@ -492,13 +493,14 @@ static int remote_mux_service_add(const char *service_name, const char *host_nam
 		}
 	} ENDFOREACH
 	if (remote) {
+		pthread_mutex_unlock(&remote_list_mutex);
 		return -2;
 	}
 	remote = remote_mux_new_with_host(host_name, port);
 	if (remote) {
-		pthread_mutex_lock(&remote_list_mutex);
 		uint8_t new_remote_id = get_new_remote_id();
 		if (new_remote_id == 0) {
+			pthread_mutex_unlock(&remote_list_mutex);
 			usbfluxd_log(LL_ERROR, "%s: Too many remotes. Release others before adding more.", __func__);
 			close(remote->fd);
 			free(remote->host);
@@ -514,9 +516,9 @@ static int remote_mux_service_add(const char *service_name, const char *host_nam
 		collection_add(&remote_list, remote);
 		set_remote_id_used(new_remote_id, 1);
 		remote_send_listen_packet(remote);
-		pthread_mutex_unlock(&remote_list_mutex);
 		res = 0;
 	}
+	pthread_mutex_unlock(&remote_list_mutex);
 	return res;
 }
 
