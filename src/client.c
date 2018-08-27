@@ -1067,6 +1067,18 @@ void client_device_remove(uint32_t device_id)
 	pthread_mutex_unlock(&client_list_mutex);
 }
 
+void client_remote_unset(struct remote_mux *remote)
+{
+	pthread_mutex_lock(&client_list_mutex);
+	usbfluxd_log(LL_DEBUG, "%s: %p", __func__, remote);
+	FOREACH(struct mux_client *client, &client_list) {
+		if (client->remote == remote) {
+			client->remote = NULL;
+		}
+	} ENDFOREACH
+	pthread_mutex_unlock(&client_list_mutex);
+}
+
 void client_init(void)
 {
 	usbfluxd_log(LL_DEBUG, "client_init");

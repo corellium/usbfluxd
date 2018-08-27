@@ -863,6 +863,7 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 
 	plist_dict_foreach(remote_device_list, remote_device_notify_remove, (void*)remote);
 	collection_remove(&remote_list, remote);
+	client_remote_unset(remote);
 
 	if (remote->is_listener && remote->host) {
 		usbfluxd_log(LL_NOTICE, "NOTE: remote %s:%d is no longer available.", remote->host, remote->port);

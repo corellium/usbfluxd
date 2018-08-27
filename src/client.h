@@ -43,6 +43,7 @@ int client_or_events(struct mux_client * client, short events);
 void client_close_notify(struct mux_client *client);
 void client_close(struct mux_client *client);
 void client_set_remote(struct mux_client *client, struct remote_mux *remote);
+void client_remote_unset(struct remote_mux *remote);
 int client_notify_connect(struct mux_client *client, enum usbmuxd_result result);
 void client_notify_remote_close(struct mux_client *client);
 int client_send_plist_pkt(struct mux_client *client, plist_t plist);
