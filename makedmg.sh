@@ -48,5 +48,12 @@ fi
 
 ./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 --icon USBFlux.pdf 0 200 $PKGNAME-$COMMIT.dmg ${SRCDIR}
 
+rm -f $PKGNAME-$COMMIT.zip
+
+cd USBFlux/build/Release
+zip -r "$THISDIR/$PKGNAME-$COMMIT.zip" USBFlux.app
+cd "$THISDIR"
+zip "$PKGNAME-$COMMIT.zip" README README.md
+
 rm -rf ${SRCDIR}
 
