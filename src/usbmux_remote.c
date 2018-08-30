@@ -528,13 +528,19 @@ static int remote_mux_service_remove(const char *service_name, const char *host_
 	pthread_mutex_lock(&remote_list_mutex);
 	struct remote_mux *remote = NULL;
 	FOREACH(struct remote_mux *r, &remote_list) {
-		if (!r->is_unix && ((service_name && (strcmp(r->service_name, service_name) == 0)) || (host_name && (strcmp(r->host, host_name) == 0) && (r->port == port)))) {
+		if (!r->is_unix && ((service_name && r->service_name && (strcmp(r->service_name, service_name) == 0)) || (host_name && (strcmp(r->host, host_name) == 0) && (r->port == port)))) {
 			remote = r;
 			break;
 		}
 	} ENDFOREACH
 	if (remote) {
+		uint8_t remote_id = remote->id;
 		usbmux_remote_dispose(remote);
+		FOREACH(struct remote_mux *r, &remote_list) {
+			if (r->id == remote_id) {
+				usbmux_remote_dispose(r);
+			}
+		} ENDFOREACH
 		res = 0;
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -879,10 +885,16 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	free(remote);
 }
 
-static void usbmux_remote_dispose_locked(struct remote_mux *remote)
+static void usbmux_remote_dispose_all(struct remote_mux *remote)
 {
 	pthread_mutex_lock(&remote_list_mutex);
+	uint8_t remote_id = remote->id;
 	usbmux_remote_dispose(remote);
+	FOREACH(struct remote_mux *r, &remote_list) {
+		if (r->id == remote_id) {
+			usbmux_remote_dispose(r);
+		}
+	} ENDFOREACH
 	pthread_mutex_unlock(&remote_list_mutex);
 }
 
@@ -1153,7 +1165,7 @@ static void remote_process_recv(struct remote_mux *remote)
 				usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
 			else
 				usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
-			usbmux_remote_dispose_locked(remote);
+			usbmux_remote_dispose_all(remote);
 			return;
 		}
 		remote->ib_size += res;
@@ -1164,12 +1176,12 @@ static void remote_process_recv(struct remote_mux *remote)
 	struct usbmuxd_header *hdr = (void*)remote->ib_buf;
 	if (hdr->length > remote->ib_capacity) {
 		usbfluxd_log(LL_INFO, "usbmux %d message is too long (%d bytes)", remote->fd, hdr->length);
-		usbmux_remote_dispose_locked(remote);
+		usbmux_remote_dispose_all(remote);
 		return;
 	}
 	if (hdr->length < sizeof(struct usbmuxd_header)) {
 		usbfluxd_log(LL_ERROR, "usbmux %d message is too short (%d bytes)", remote->fd, hdr->length);
-		usbmux_remote_dispose_locked(remote);
+		usbmux_remote_dispose_all(remote);
 		return;
 	}
 	if (remote->ib_size < hdr->length) {
@@ -1178,11 +1190,11 @@ static void remote_process_recv(struct remote_mux *remote)
 		res = recv(remote->fd, remote->ib_buf + remote->ib_size, hdr->length - remote->ib_size, 0);
 		if (res < 0) {
 			usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
-			usbmux_remote_dispose_locked(remote);
+			usbmux_remote_dispose_all(remote);
 			return;
 		} else if(res == 0) {
 			usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
-			usbmux_remote_dispose_locked(remote);
+			usbmux_remote_dispose_all(remote);
 			return;
 		}
 		remote->ib_size += res;
