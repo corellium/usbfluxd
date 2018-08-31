@@ -345,8 +345,10 @@ static int match_device(const char* key, const plist_t value, void *context)
 	if (p_udid) plist_get_string_val(p_udid, &device_udid);
 	if (device_udid && (strcmp(device_udid, matchctx->record_id) == 0)) {
 		matchctx->device_id = (uint32_t)strtol(key, NULL, 16);
+		free(device_udid);
 		return -1;
 	}
+	free(device_udid);
 	return 0;
 }
 
@@ -1074,6 +1076,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 			} else if (msgtype && (strcmp(msgtype, "Detached") == 0)) {
 				type = MESSAGE_DEVICE_REMOVE;
 			}
+			free(msgtype);
 			if (p_devid) {
 				uint64_t u64val = 0;
 				plist_get_uint_val(p_devid, &u64val);
