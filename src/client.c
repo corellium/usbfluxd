@@ -994,7 +994,7 @@ void client_process(int fd, short events)
 	pthread_mutex_unlock(&client_list_mutex);
 
 	if(!client) {
-		usbfluxd_log(LL_INFO, "client_process: fd %d not found in client list", fd);
+		usbfluxd_log(LL_DEBUG, "client_process: fd %d not found in client list", fd);
 		return;
 	}
 

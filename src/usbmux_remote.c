@@ -524,6 +524,33 @@ static int remote_mux_service_add(const char *service_name, const char *host_nam
 	return res;
 }
 
+static void remote_mark_dead(struct remote_mux *remote)
+{
+	/* mark as dead, and all others with same remote id */
+	remote->state = REMOTE_DEAD;
+	FOREACH(struct remote_mux *r, &remote_list) {
+		if (r->id == remote->id) {
+			r->state = REMOTE_DEAD;
+		}
+	} ENDFOREACH
+	/* pick the first remote found to trigger a dummy event so the deads are reaped in usbmux_remote_process */
+	struct remote_mux *rem = NULL;
+	FOREACH(struct remote_mux *r, &remote_list) {
+		if (r->state != REMOTE_DEAD) {
+			r->events |= POLLOUT;
+			rem = r;
+			break;
+		}
+	} ENDFOREACH
+	if (!rem) {
+		/* only if no remote is left, do the cleanup here */
+		usbfluxd_log(LL_DEBUG, "%s: no remote left, reaping dead remotes", __func__);
+		FOREACH(struct remote_mux *r, &remote_list) {
+			usbmux_remote_dispose(r);
+		} ENDFOREACH
+	}
+}
+
 static int remote_mux_service_remove(const char *service_name, const char *host_name, uint16_t port)
 {
 	int res = -1;
@@ -536,13 +563,7 @@ static int remote_mux_service_remove(const char *service_name, const char *host_
 		}
 	} ENDFOREACH
 	if (remote) {
-		uint8_t remote_id = remote->id;
-		usbmux_remote_dispose(remote);
-		FOREACH(struct remote_mux *r, &remote_list) {
-			if (r->id == remote_id) {
-				usbmux_remote_dispose(r);
-			}
-		} ENDFOREACH
+		remote_mark_dead(remote);
 		res = 0;
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -874,6 +895,9 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	plist_dict_foreach(remote_device_list, remote_device_notify_remove, (void*)remote);
 	collection_remove(&remote_list, remote);
 	client_remote_unset(remote);
+	if (remote->client) {
+		client_notify_remote_close(remote->client);
+	}
 
 	if (remote->is_listener && remote->host) {
 		usbfluxd_log(LL_NOTICE, "NOTE: remote %s:%d is no longer available.", remote->host, remote->port);
@@ -887,16 +911,11 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	free(remote);
 }
 
-static void usbmux_remote_dispose_all(struct remote_mux *remote)
+static void usbmux_remote_mark_dead(struct remote_mux *remote)
 {
 	pthread_mutex_lock(&remote_list_mutex);
-	uint8_t remote_id = remote->id;
-	usbmux_remote_dispose(remote);
-	FOREACH(struct remote_mux *r, &remote_list) {
-		if (r->id == remote_id) {
-			usbmux_remote_dispose(r);
-		}
-	} ENDFOREACH
+	usbfluxd_log(LL_DEBUG, "%s: %p", __func__, remote);
+	remote_mark_dead(remote);
 	pthread_mutex_unlock(&remote_list_mutex);
 }
 
@@ -1129,7 +1148,7 @@ static void remote_process_send(struct remote_mux *remote)
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
 	int res;
 	if(!remote->ob_size) {
-		usbfluxd_log(LL_WARNING, "Remote %d OUT process but nothing to send?", remote->fd);
+		usbfluxd_log(LL_DEBUG, "Remote %d OUT process but nothing to send?", remote->fd);
 		remote->events &= ~POLLOUT;
 		return;
 	}
@@ -1168,7 +1187,7 @@ static void remote_process_recv(struct remote_mux *remote)
 				usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
 			else
 				usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
-			usbmux_remote_dispose_all(remote);
+			usbmux_remote_mark_dead(remote);
 			return;
 		}
 		remote->ib_size += res;
@@ -1179,12 +1198,12 @@ static void remote_process_recv(struct remote_mux *remote)
 	struct usbmuxd_header *hdr = (void*)remote->ib_buf;
 	if (hdr->length > remote->ib_capacity) {
 		usbfluxd_log(LL_INFO, "usbmux %d message is too long (%d bytes)", remote->fd, hdr->length);
-		usbmux_remote_dispose_all(remote);
+		usbmux_remote_mark_dead(remote);
 		return;
 	}
 	if (hdr->length < sizeof(struct usbmuxd_header)) {
 		usbfluxd_log(LL_ERROR, "usbmux %d message is too short (%d bytes)", remote->fd, hdr->length);
-		usbmux_remote_dispose_all(remote);
+		usbmux_remote_mark_dead(remote);
 		return;
 	}
 	if (remote->ib_size < hdr->length) {
@@ -1193,11 +1212,11 @@ static void remote_process_recv(struct remote_mux *remote)
 		res = recv(remote->fd, remote->ib_buf + remote->ib_size, hdr->length - remote->ib_size, 0);
 		if (res < 0) {
 			usbfluxd_log(LL_ERROR, "Receive from usbmux fd %d failed: %s", remote->fd, strerror(errno));
-			usbmux_remote_dispose_all(remote);
+			usbmux_remote_mark_dead(remote);
 			return;
 		} else if(res == 0) {
 			usbfluxd_log(LL_INFO, "usbmux %d connection closed", remote->fd);
-			usbmux_remote_dispose_all(remote);
+			usbmux_remote_mark_dead(remote);
 			return;
 		}
 		remote->ib_size += res;
@@ -1213,16 +1232,18 @@ void usbmux_remote_process(int fd, short events)
 {
 	struct remote_mux *remote = NULL;
 	pthread_mutex_lock(&remote_list_mutex);
+	/* find matching remote, but also reap dead remotes */
 	FOREACH(struct remote_mux *rm, &remote_list) {
-		if(rm->fd == fd) {
+		if (rm->state == REMOTE_DEAD) {
+			usbmux_remote_dispose(rm);
+		} else if (rm->fd == fd) {
 			remote = rm;
-			break;
 		}
 	} ENDFOREACH
 	pthread_mutex_unlock(&remote_list_mutex);
 
 	if(!remote) {
-		usbfluxd_log(LL_INFO, "%s: fd %d not found in remote mux list", __func__, fd);
+		usbfluxd_log(LL_DEBUG, "%s: fd %d not found in remote mux list", __func__, fd);
 		return;
 	}
 
