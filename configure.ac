@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.64)
-AC_INIT([usbfluxd], [1.1.0], [https://github.com/libimobiledevice/usbmuxd/issues],, [http://libimobiledevice.org])
+AC_INIT([usbfluxd], [1.1.1], [https://github.com/libimobiledevice/usbmuxd/issues],, [http://libimobiledevice.org])
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip check-news])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES])
 AC_CONFIG_SRCDIR([src/])
@@ -84,6 +84,7 @@ if test "x$with_static_libplist" != "xno"; then
   AC_SUBST(libplist_LIBS, [$STATIC_LIBPLIST])
 fi
 
+#AS_COMPILER_FLAGS(GLOBAL_CFLAGS, "-g -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith  -Wwrite-strings -Wswitch-default -Wno-unused-parameter -fsanitize=address -fsanitize-address-use-after-scope -fsanitize=ubsan -O0 -fno-inline -fno-omit-frame-pointer")
 AS_COMPILER_FLAGS(GLOBAL_CFLAGS, "-g -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith  -Wwrite-strings -Wswitch-default -Wno-unused-parameter")
 AC_SUBST(GLOBAL_CFLAGS)
 
