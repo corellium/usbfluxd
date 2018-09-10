@@ -255,12 +255,12 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 		FOREACH(struct remote_mux *r, &remote_list) {
 			if (r->id == remote_mux_id && r->state == REMOTE_LISTEN) {
 				remote = remote_mux_new_with_host(r->host, r->port);
-				remote->id = remote_mux_id;
 				break;
 			}	
 		} ENDFOREACH
 	}
 	if (remote) {
+		remote->id = remote_mux_id;
 		remote->state = REMOTE_CONNECTING1;
 		remote->client = client;
 		client_set_remote(client, remote);
