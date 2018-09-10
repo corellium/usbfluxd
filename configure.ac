@@ -84,7 +84,6 @@ if test "x$with_static_libplist" != "xno"; then
   AC_SUBST(libplist_LIBS, [$STATIC_LIBPLIST])
 fi
 
-#AS_COMPILER_FLAGS(GLOBAL_CFLAGS, "-g -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith  -Wwrite-strings -Wswitch-default -Wno-unused-parameter -fsanitize=address -fsanitize-address-use-after-scope -fsanitize=ubsan -O0 -fno-inline -fno-omit-frame-pointer")
 AS_COMPILER_FLAGS(GLOBAL_CFLAGS, "-g -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith  -Wwrite-strings -Wswitch-default -Wno-unused-parameter")
 AC_SUBST(GLOBAL_CFLAGS)
 
