@@ -275,6 +275,7 @@ static void usage()
 	printf("  -h, --help\t\tPrint this message.\n");
 	printf("  -v, --verbose\t\tBe verbose (use twice or more to increase).\n");
 	printf("  -f, --foreground\tDo not daemonize (implies one -v).\n");
+	printf("  -r, --remote\t\tConnect to the specified remote usbmuxd, specified as host:port.\n");
 	printf("  -n, --no-usbmuxd\tRun even if local usbmuxd is not available.\n");
 	printf("  -V, --version\t\tPrint version information and exit.\n");
 	printf("\n");
