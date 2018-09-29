@@ -38,16 +38,11 @@
 #include "socket.h"
 #include "log.h"
 
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
-#endif
-
 int socket_connect_unix(const char *filename)
 {
 	struct sockaddr_un name;
 	int sfd = -1;
 	int bufsize = 0x20000;
-	size_t size;
 	struct stat fst;
 #ifdef SO_NOSIGPIPE
 	int yes = 1;
@@ -90,10 +85,7 @@ int socket_connect_unix(const char *filename)
 	strncpy(name.sun_path, filename, sizeof(name.sun_path));
 	name.sun_path[sizeof(name.sun_path) - 1] = 0;
 
-	size = (offsetof(struct sockaddr_un, sun_path)
-			+ strlen(name.sun_path) + 1);
-
-	if (connect(sfd, (struct sockaddr *) &name, size) < 0) {
+	if (connect(sfd, (struct sockaddr *) &name, sizeof(name)) < 0) {
 		socket_close(sfd);
 		usbfluxd_log(LL_DEBUG, "%s: connect: %s", __func__, strerror(errno));
 		return -1;
@@ -102,7 +94,7 @@ int socket_connect_unix(const char *filename)
 	return sfd;
 }
 
-int socket_connect(const char *addr, uint16_t port)
+int socket_connect_timeout(const char *addr, uint16_t port, struct timeval *timeout)
 {
 	int sfd = -1;
 	int yes = 1;
@@ -161,13 +153,50 @@ int socket_connect(const char *addr, uint16_t port)
 	saddr.sin_addr.s_addr = *(uint32_t *) hp->h_addr;
 	saddr.sin_port = htons(port);
 
-	if (connect(sfd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0) {
-		usbfluxd_log(LL_ERROR, "%s: connect: %s", __func__, strerror(errno));
+	fcntl(sfd, F_SETFL, O_NONBLOCK);
+
+	int res = connect(sfd, (struct sockaddr *) &saddr, sizeof(saddr));
+	if (res == 0) {
+		return sfd;
+	}
+	if (errno != EINPROGRESS) {
 		socket_close(sfd);
-		return -2;
+		usbfluxd_log(LL_ERROR, "%s: ERROR: connect: %s", __func__, strerror(errno));
+		return -1;
 	}
 
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(sfd, &fds);
+
+	struct timeval default_timeout = { 10, 0 };
+	int rc = select(sfd + 1, NULL, &fds, NULL, (timeout) ? timeout : &default_timeout);
+	if (rc == 1) {
+		int so_error;
+		socklen_t len = sizeof(so_error);
+		getsockopt(sfd, SOL_SOCKET, SO_ERROR, &so_error, &len);
+		if (so_error == 0) {
+			usbfluxd_log(LL_ERROR, "%s:%d is open", addr, port);
+		} else {
+			usbfluxd_log(LL_ERROR, "socket error %d", so_error);
+			socket_close(sfd);
+			sfd = -1;
+		}
+	} else if (rc == 0) {
+		usbfluxd_log(LL_DEBUG, "%s: connect: timeout", __func__);
+		socket_close(sfd);
+		sfd = -1;
+	} else {
+		usbfluxd_log(LL_ERROR, "%s: ERROR: select: %s", __func__, strerror(errno));
+		socket_close(sfd);
+		sfd = -1;
+	}
 	return sfd;
+}
+
+int socket_connect(const char *addr, uint16_t port)
+{
+	return socket_connect_timeout(addr, port, NULL);
 }
 
 int socket_create_unix(const char *socket_path)

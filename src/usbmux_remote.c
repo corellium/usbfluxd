@@ -131,6 +131,7 @@ static struct remote_mux* remote_mux_new_with_fd(int fd)
 	remote->events = POLLIN;
 	remote->state = REMOTE_COMMAND;
 	remote->last_command = -1;
+	remote->last_active = mstime64();
 
 	usbfluxd_log(LL_INFO, "New Remote fd %d", fd);
 
@@ -153,7 +154,8 @@ static struct remote_mux* remote_mux_new_with_unix_socket(const char *upath)
 
 static struct remote_mux* remote_mux_new_with_host(const char *hostname, uint16_t port)
 {
-	int fd = socket_connect(hostname, port);
+	struct timeval timeout = { 5, 0 };
+	int fd = socket_connect_timeout(hostname, port, &timeout);
 	if (fd < 0) {
 		usbfluxd_log(LL_ERROR, "ERROR: Could not connect to %s:%u", hostname, port);
 		return NULL;
@@ -926,10 +928,35 @@ void usbmux_remote_notify_client_close(struct remote_mux *remote)
 	pthread_mutex_unlock(&remote_list_mutex);
 }
 
+void *check_remote_func(void* data)
+{
+	struct remote_mux *remote = (struct remote_mux*)data;
+	struct timeval timeout = { 2, 0 };
+	int openfd = remote->fd;
+	int checkfd = socket_connect_timeout(remote->host, remote->port, &timeout);
+	if (checkfd < 0) {
+		socket_close(openfd);
+	} else {
+		socket_close(checkfd);
+	}
+	return NULL;
+}
+
 void usbmux_remote_get_fds(struct fdlist *list)
 {
 	pthread_mutex_lock(&remote_list_mutex);
+	uint64_t now = mstime64();
 	FOREACH(struct remote_mux *remote, &remote_list) {
+		/* check if any remotes became unavailable due to network error */
+		if (!remote->is_unix && (now - remote->last_active) > 10000) {
+			if (remote->host && remote->port) {
+				pthread_t th;
+				if (pthread_create(&th, NULL, check_remote_func, remote) != 0) {
+					usbfluxd_log(LL_ERROR, "%s: Failed to create thread to check remote", __func__);
+				}
+			}
+			remote->last_active = now;
+		}
 		fdlist_add(list, FD_REMOTE, remote->fd, remote->events);
 	} ENDFOREACH
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -1160,6 +1187,7 @@ static void remote_process_send(struct remote_mux *remote)
 		usbmux_remote_close(remote);
 		return;
 	}
+	remote->last_active = mstime64();
 	if((uint32_t)res == remote->ob_size) {
 		remote->ob_size = 0;
 		remote->events &= ~POLLOUT;
@@ -1219,6 +1247,7 @@ static void remote_process_recv(struct remote_mux *remote)
 			usbmux_remote_mark_dead(remote);
 			return;
 		}
+		remote->last_active = mstime64();
 		remote->ib_size += res;
 		if (remote->ib_size < hdr->length)
 			return;
@@ -1238,6 +1267,11 @@ void usbmux_remote_process(int fd, short events)
 			usbmux_remote_dispose(rm);
 		} else if (rm->fd == fd) {
 			remote = rm;
+			if (events == POLLNVAL) {
+				usbfluxd_log(LL_DEBUG, "%s: remote fd %d became invalid", __func__, fd);
+				usbmux_remote_dispose(rm);
+				remote = NULL;
+			}
 		}
 	} ENDFOREACH
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -1268,6 +1302,7 @@ void usbmux_remote_process(int fd, short events)
 				usbfluxd_log(LL_DEBUG, "%s: remote read returned 0", __func__);
 				remote->events &= ~POLLIN;
 			} else if (r > 0) {
+				remote->last_active = mstime64();
 				usbfluxd_log(LL_DEBUG, "%s: read %d bytes from remote (fd %d) requested %u", __func__, r, remote->fd, remote->ib_capacity - remote->ib_size);
 				remote->ib_size += r;
 				//client_set_events(remote->client, POLLOUT); //client->events |= POLLOUT;

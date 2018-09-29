@@ -60,6 +60,7 @@ struct remote_mux {
 	char *host;
 	uint16_t port;
 	struct mux_client* client;
+	uint64_t last_active;
 };
 
 void usbmux_remote_init(void);

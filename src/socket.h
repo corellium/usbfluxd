@@ -20,9 +20,11 @@
 #define __SOCKET_H
 
 #include <stdint.h>
+#include <sys/time.h>
 
 int socket_connect_unix(const char *filename);
 int socket_connect(const char *addr, uint16_t port);
+int socket_connect_timeout(const char *addr, uint16_t port, struct timeval *timeout);
 int socket_create_unix(const char *socket_path);
 int socket_close(int sfd);
 
