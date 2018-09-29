@@ -805,10 +805,10 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					if (rv < 0) {
 						int rc = RESULT_CONNREFUSED;
 						if (rv == -2) {
-							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u (already present)\n", hostaddr, portnum);
+							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u (already present)", hostaddr, portnum);
 							rc = RESULT_BADDEV;
 						} else {
-							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u\n", hostaddr, portnum);
+							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u", hostaddr, portnum);
 						}
 						free(hostaddr);
 						if (send_result(client, hdr->tag, rc) < 0)
@@ -844,7 +844,7 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 					portnum = (uint16_t)val;
 
 					if (usbmux_remote_remove_remote(hostaddr, portnum) < 0) {
-						usbfluxd_log(LL_ERROR, "Failed to remove remote %s:%u\n", hostaddr, portnum);
+						usbfluxd_log(LL_ERROR, "Failed to remove remote %s:%u", hostaddr, portnum);
 						free(hostaddr);
 						if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
 							return -1;
