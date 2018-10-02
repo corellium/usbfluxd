@@ -56,6 +56,7 @@ static struct collection remote_list;
 pthread_mutex_t remote_list_mutex;
 static plist_t remote_device_list = NULL;
 static uint8_t remote_id_map[32];
+static int opt_no_mdns = 0;
 
 static void set_remote_id_used(uint8_t idval, int used)
 {
@@ -794,7 +795,7 @@ int usbmux_remote_remove_remote(const char *host_name, uint16_t port)
 	return res;
 }
 
-void usbmux_remote_init(void)
+void usbmux_remote_init(int no_mdns)
 {
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
 
@@ -802,6 +803,8 @@ void usbmux_remote_init(void)
 	pthread_mutex_init(&remote_list_mutex, NULL);
 	remote_device_list = plist_new_dict();
 	memset(&remote_id_map, '\0', sizeof(remote_id_map));
+
+	opt_no_mdns = no_mdns;
 
 	struct remote_mux *remote = remote_mux_new_with_unix_socket(USBMUXD_RENAMED_SOCKET);
 	if (remote) {
@@ -814,24 +817,30 @@ void usbmux_remote_init(void)
 		pthread_mutex_unlock(&remote_list_mutex);
 	}
 
-	pthread_create(&th_mdns_mon, NULL, mdns_monitor_thread, NULL);
+	if (opt_no_mdns) {
+		usbfluxd_log(LL_WARNING, "mDNS support disabled - instances have to be managed manually");
+	} else {
+		pthread_create(&th_mdns_mon, NULL, mdns_monitor_thread, NULL);
+	}
 }
 
 void usbmux_remote_shutdown(void)
 {
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
 
+	if (!opt_no_mdns) {
 #ifdef HAVE_CFNETWORK
-	CFStreamError err;
-	CFNetServiceBrowserStopSearch(service_browser, &err);
-	pthread_join(th_mdns_mon, NULL);
+		CFStreamError err;
+		CFNetServiceBrowserStopSearch(service_browser, &err);
+		pthread_join(th_mdns_mon, NULL);
 #endif
 #ifdef HAVE_AVAHI_CLIENT
-	if (simple_poll) {
-		avahi_simple_poll_quit(simple_poll);
-	}
-	pthread_join(th_mdns_mon, NULL);
+		if (simple_poll) {
+			avahi_simple_poll_quit(simple_poll);
+		}
+		pthread_join(th_mdns_mon, NULL);
 #endif
+	}
 	pthread_mutex_lock(&remote_list_mutex);
 	FOREACH(struct remote_mux *remote, &remote_list) {
 		usbmux_remote_dispose(remote);

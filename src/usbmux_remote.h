@@ -63,7 +63,7 @@ struct remote_mux {
 	uint64_t last_active;
 };
 
-void usbmux_remote_init(void);
+void usbmux_remote_init(int no_mdns);
 void usbmux_remote_shutdown(void);
 
 plist_t usbmux_remote_get_device_list();

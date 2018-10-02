@@ -57,6 +57,7 @@ static int foreground = 0;
 static int daemon_pipe;
 static int renamed = 0;
 static int opt_no_usbmuxd = 0;
+static int opt_no_mdns = 0;
 
 static char *remote_host = NULL;
 static uint16_t remote_port = 0;
@@ -277,6 +278,7 @@ static void usage()
 	printf("  -f, --foreground\tDo not daemonize (implies one -v).\n");
 	printf("  -r, --remote\t\tConnect to the specified remote usbmuxd, specified as host:port.\n");
 	printf("  -n, --no-usbmuxd\tRun even if local usbmuxd is not available.\n");
+	printf("  -m, --no-mdns\tDisable automatic detection via mDNS.\n");
 	printf("  -V, --version\t\tPrint version information and exit.\n");
 	printf("\n");
 }
@@ -290,11 +292,12 @@ static void parse_opts(int argc, char **argv)
 		{"version", 0, NULL, 'V'},
 		{"remote", required_argument, NULL, 'r'},
 		{"no-usbmuxd", 0, NULL, 'n'},
+		{"no-mdns", 0, NULL, 'm'},
 		{NULL, 0, NULL, 0}
 	};
 	int c;
 
-	const char* opts_spec = "hfvVr:n";
+	const char* opts_spec = "hfvVr:nm";
 
 	while (1) {
 		c = getopt_long(argc, argv, opts_spec, longopts, (int *) 0);
@@ -317,6 +320,9 @@ static void parse_opts(int argc, char **argv)
 			exit(0);
 		case 'n':
 			opt_no_usbmuxd = 1;
+			break;
+		case 'm':
+			opt_no_mdns = 1;
 			break;
 		case 'r': {
 			char *colon = strchr(optarg, ':');
@@ -450,7 +456,7 @@ int main(int argc, char *argv[])
 		goto terminate;
 
 	client_init();
-	usbmux_remote_init();
+	usbmux_remote_init(opt_no_mdns);
 
 	usbfluxd_log(LL_NOTICE, "Initialization complete");
 
