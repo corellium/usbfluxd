@@ -14,6 +14,9 @@
 		0430E95220C00CA30047F28C /* AuthIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = 0430E95120C00CA30047F28C /* AuthIcon.png */; };
 		0430E95420C02E5B0047F28C /* usbfluxd in Resources */ = {isa = PBXBuildFile; fileRef = 0430E95320C02E5B0047F28C /* usbfluxd */; };
 		047357A420DB2A9F0089445A /* terminate.sh in Resources */ = {isa = PBXBuildFile; fileRef = 047357A320DB2A9F0089445A /* terminate.sh */; };
+		04D7270C215BD74000B29E2E /* Corellium.m in Sources */ = {isa = PBXBuildFile; fileRef = 04D7270B215BD74000B29E2E /* Corellium.m */; };
+		04D7270F215C13E800B29E2E /* PasswordEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 04D7270E215C13E800B29E2E /* PasswordEntry.m */; };
+		04D72717215C53DB00B29E2E /* SimpleTextInput.m in Sources */ = {isa = PBXBuildFile; fileRef = 04D72716215C53DB00B29E2E /* SimpleTextInput.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +31,12 @@
 		0430E95120C00CA30047F28C /* AuthIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AuthIcon.png; sourceTree = "<group>"; };
 		0430E95320C02E5B0047F28C /* usbfluxd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = usbfluxd; path = ../src/usbfluxd; sourceTree = "<group>"; };
 		047357A320DB2A9F0089445A /* terminate.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; name = terminate.sh; path = USBFlux/terminate.sh; sourceTree = "<group>"; };
+		04D7270A215BD74000B29E2E /* Corellium.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Corellium.h; sourceTree = "<group>"; };
+		04D7270B215BD74000B29E2E /* Corellium.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Corellium.m; sourceTree = "<group>"; };
+		04D7270D215C13E800B29E2E /* PasswordEntry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PasswordEntry.h; sourceTree = "<group>"; };
+		04D7270E215C13E800B29E2E /* PasswordEntry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PasswordEntry.m; sourceTree = "<group>"; };
+		04D72715215C53DB00B29E2E /* SimpleTextInput.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SimpleTextInput.h; sourceTree = "<group>"; };
+		04D72716215C53DB00B29E2E /* SimpleTextInput.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SimpleTextInput.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +79,12 @@
 				0430E93D20BEF9F10047F28C /* Info.plist */,
 				0430E93E20BEF9F10047F28C /* main.m */,
 				0430E94020BEF9F10047F28C /* USBFlux.entitlements */,
+				04D7270A215BD74000B29E2E /* Corellium.h */,
+				04D7270B215BD74000B29E2E /* Corellium.m */,
+				04D7270D215C13E800B29E2E /* PasswordEntry.h */,
+				04D7270E215C13E800B29E2E /* PasswordEntry.m */,
+				04D72715215C53DB00B29E2E /* SimpleTextInput.h */,
+				04D72716215C53DB00B29E2E /* SimpleTextInput.m */,
 			);
 			path = USBFlux;
 			sourceTree = "<group>";
@@ -151,8 +166,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				04D7270C215BD74000B29E2E /* Corellium.m in Sources */,
 				0430E93F20BEF9F10047F28C /* main.m in Sources */,
 				0430E93720BEF9F00047F28C /* AppDelegate.m in Sources */,
+				04D72717215C53DB00B29E2E /* SimpleTextInput.m in Sources */,
+				04D7270F215C13E800B29E2E /* PasswordEntry.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

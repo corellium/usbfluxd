@@ -7,6 +7,9 @@
 //
 
 #import "AppDelegate.h"
+#import "Corellium.h"
+#import "PasswordEntry.h"
+#import "SimpleTextInput.h"
 #include <Security/Security.h>
 
 #include <sys/sysctl.h>
@@ -18,15 +21,22 @@
 
 static AuthorizationRef authorization = nil;
 
+#define APPID CFSTR("com.corellium.USBFlux")
+
 @interface AppDelegate ()
 {
     NSTimer *checkTimer;
-    NSTask *usbfluxdTask;
     char *usbfluxd_path;
     char *terminate_path;
+    Corellium *corellium;
+    NSTimer *enumTimer;
+    int usbfluxd_running;
+    int no_mdns;
+    BOOL autostart_after_config;
 }
 @property (weak) IBOutlet NSTextField *statusLabel;
 @property (weak) IBOutlet NSTextField *detailLabel;
+@property (weak) IBOutlet NSTextField *apiLabel;
 @property (weak) IBOutlet NSWindow *window;
 @property (weak) IBOutlet NSButton *startStopButton;
 @property (weak) IBOutlet NSButton *cbAutoStart;
@@ -151,6 +161,64 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     }
     
     return err;
+}
+
+NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
+{
+    id result = nil;
+    
+    int sfd = socket_connect_unix("/var/run/usbmuxd");
+    if (sfd < 0) {
+        return nil;
+    }
+    
+    char buf[65536];
+    if (req_len == 0) {
+        req_len = (uint32_t)strlen(req_xml);
+    }
+    struct usbmuxd_header muxhdr;
+    muxhdr.length = sizeof(struct usbmuxd_header) + req_len;
+    muxhdr.version = 1;
+    muxhdr.message = 8;
+    muxhdr.tag = 0;
+    
+    if (send(sfd, &muxhdr, sizeof(struct usbmuxd_header), 0) == sizeof(struct usbmuxd_header)) {
+        if (send(sfd, req_xml, req_len, 0) == req_len) {
+            if (recv(sfd, &muxhdr, sizeof(struct usbmuxd_header), 0) == sizeof(struct usbmuxd_header)) {
+                if ((muxhdr.version == 1) && (muxhdr.message == 8) && (muxhdr.tag == 0)) {
+                    char *p = &buf[0];
+                    uint32_t rr = 0;
+                    uint32_t total = muxhdr.length - sizeof(struct usbmuxd_header);
+                    if (total > sizeof(buf)) {
+                        p = malloc(total);
+                    } else {
+                        p = &buf[0];
+                    }
+                    while (rr < total) {
+                        ssize_t r = recv(sfd, p + rr, total - rr, 0);
+                        if (r < 0) {
+                            break;
+                        }
+                        rr += r;
+                    }
+                    if (rr == total) {
+                        NSDictionary *dict = [NSPropertyListSerialization propertyListWithData:[NSData dataWithBytesNoCopy:p length:total freeWhenDone:NO] options:0 format:nil error:nil];
+                        result = dict;
+                    } else {
+                        NSLog(@"Could not get all data back");
+                    }
+                    if (total > sizeof(buf)) {
+                        free(p);
+                    }
+                }
+            } else {
+                NSLog(@"didn't receive as much data as we need");
+            }
+        }
+    }
+    close(sfd);
+    
+    return result;
 }
 
 @implementation AppDelegate
@@ -285,7 +353,10 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     posix_spawn_file_actions_init(&action);
     
     pid_t pid = 0;
-    char *argv[] = { usbfluxd_path, "-v", NULL };
+    char *argv[4] = { usbfluxd_path, "-v", NULL, NULL};
+    if (no_mdns) {
+        argv[2] = "-m";
+    }
     char *env[] = { NULL };
     int status = posix_spawn(&pid, argv[0], &action, &spawnattr, argv, env);
     if (status != 0) {
@@ -384,62 +455,9 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 
 - (NSDictionary*)getInstances
 {
-    id result = nil;
-
-    int sfd = socket_connect_unix("/var/run/usbmuxd");
-    if (sfd < 0) {
-        return nil;
-    }
-
     const char req_xml[] = "<plist version=\"1.0\"><dict><key>MessageType</key><string>Instances</string></dict></plist>";
-    char buf[65536];
-    
-    struct usbmuxd_header muxhdr;
-    muxhdr.length = sizeof(struct usbmuxd_header) + sizeof(req_xml);
-    muxhdr.version = 1;
-    muxhdr.message = 8;
-    muxhdr.tag = 0;
-    
-    if (send(sfd, &muxhdr, sizeof(struct usbmuxd_header), 0) == sizeof(struct usbmuxd_header)) {
-        if (send(sfd, req_xml, sizeof(req_xml), 0) == sizeof(req_xml)) {
-            if (recv(sfd, &muxhdr, sizeof(struct usbmuxd_header), 0) == sizeof(struct usbmuxd_header)) {
-                if ((muxhdr.version == 1) && (muxhdr.message == 8) && (muxhdr.tag == 0)) {
-                    char *p = &buf[0];
-                    uint32_t rr = 0;
-                    uint32_t total = muxhdr.length - sizeof(struct usbmuxd_header);
-                    if (total > sizeof(buf)) {
-                        p = malloc(total);
-                    } else {
-                        p = &buf[0];
-                    }
-                    while (rr < total) {
-                        ssize_t r = recv(sfd, p + rr, total - rr, 0);
-                        if (r < 0) {
-                            break;
-                        }
-                        rr += r;
-                    }
-                    if (rr == total) {
-                        NSDictionary *dict = [NSPropertyListSerialization propertyListWithData:[NSData dataWithBytesNoCopy:p length:total freeWhenDone:NO] options:0 format:nil error:nil];
-                        NSDictionary *instances = (dict) ? [dict objectForKey:@"Instances"] : nil;
-                        if (instances) {
-                            result = instances;
-                        }
-                    } else {
-                        NSLog(@"Could not get all data back");
-                    }
-                    if (total > sizeof(buf)) {
-                        free(p);
-                    }
-                }
-            } else {
-                NSLog(@"didn't receive as much data as we need");
-            }
-        }
-    }
-    close(sfd);
-    
-    return result;
+    NSDictionary *dict = usbfluxdQuery(req_xml, sizeof(req_xml));
+    return (dict) ? [dict objectForKey:@"Instances"] : nil;
 }
 
 - (void)checkStatus:(NSTimer*)timer
@@ -449,6 +467,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
     }
     NSDictionary *instances = [self getInstances];
     if (instances) {
+        usbfluxd_running = 1;
         self.statusLabel.stringValue = @"USBFlux is running.";
         self.startStopButton.title = @"Stop";
         self.startStopButton.tag = 1;
@@ -476,6 +495,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         self.detailLabel.stringValue = [NSString stringWithFormat:@"%d Instance%s (%d Local / %d Remote)\n%d Device%s (%d Local / %d Remote)", local_count+remote_count,  (local_count+remote_count == 1) ? "" : "s", local_count, remote_count, local_devices+remote_devices, (local_devices+remote_devices == 1) ? "" : "s", local_devices, remote_devices];
         self.detailLabel.hidden = NO;
     } else {
+        usbfluxd_running = 0;
         self.statusLabel.stringValue = @"USBFlux is not running.";
         self.startStopButton.title = @"Start";
         self.startStopButton.tag = 0;
@@ -505,12 +525,348 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
             }
         }
     }
+    no_mdns = 0;
+    autostart_after_config = NO;
+}
+
+- (int)addInstance:(NSString*)host port:(unsigned int)port
+{
+    char req_xml[256];
+    unsigned int req_len = snprintf(req_xml, 255, "<plist version=\"1.0\"><dict><key>MessageType</key><string>AddInstance</string><key>HostAddress</key><string>%s</string><key>PortNumber</key><integer>%u</integer></dict></plist>", [host UTF8String], port);
+    NSDictionary *dict = usbfluxdQuery(req_xml, req_len);
+    NSNumber *num = (dict) ? [dict objectForKey:@"Number"] : nil;
+    if (num) {
+        return [num intValue];
+    }
+    return -1;
+}
+
+- (int)removeInstance:(NSString*)host port:(unsigned int)port
+{
+    char req_xml[256];
+    unsigned int req_len = snprintf(req_xml, 255, "<plist version=\"1.0\"><dict><key>MessageType</key><string>RemoveInstance</string><key>HostAddress</key><string>%s</string><key>PortNumber</key><integer>%u</integer></dict></plist>", [host UTF8String], port);
+    NSDictionary *dict = usbfluxdQuery(req_xml, req_len);
+    NSNumber *num = (dict) ? [dict objectForKey:@"Number"] : nil;
+    if (num) {
+        return [num intValue];
+    }
+    return -1;
+}
+
+- (void)getRemoteInstances
+{
+    if (corellium && usbfluxd_running) {
+        NSError *err = nil;
+        NSArray *instances = [corellium instances:&err withQuery:@"returnAttr=port-adb,port-usbmuxd,serviceIp,state"];
+        if (err) {
+            [self setApiStatus:[NSString stringWithFormat:@"%@ disconnected", corellium.domain]];
+        } else {
+            [self setApiStatus:[NSString stringWithFormat:@"Connected to %@", corellium.domain]];
+        }
+        for (NSDictionary *instance in instances) {
+            /* must be on */
+            NSString *state = [instance objectForKey:@"state"];
+            if (![state isEqualToString:@"on"])
+                continue;
+            /* not android */
+            id portAdb = [instance objectForKey:@"port-adb"];
+            if (portAdb)
+                continue;
+            /* has usbmuxd port */
+            NSString *usbmuxdPort = [instance objectForKey:@"port-usbmuxd"];
+            if (!usbmuxdPort)
+                continue;
+            /* and service ip */
+            NSString *serviceIp = [instance objectForKey:@"serviceIp"];
+            if (!serviceIp)
+                continue;
+            [self addInstance:serviceIp port:(unsigned int)[usbmuxdPort intValue]];
+        }
+    }
+}
+
+- (void)enumDevices:(NSTimer*)timer
+{
+    [NSThread detachNewThreadSelector:@selector(getRemoteInstances) toTarget:self withObject:nil];
+}
+
+- (void)startEnumTimer
+{
+    [self enumDevices:nil];
+    enumTimer = [NSTimer scheduledTimerWithTimeInterval:10.0 target:self selector:@selector(enumDevices:) userInfo:nil repeats:YES];
+}
+
+- (void)setApiStatus:(NSString*)status
+{
+    [self.apiLabel performSelectorOnMainThread:@selector(setStringValue:) withObject:status waitUntilDone:NO];
+}
+
+- (void)timeoutRetryLogin:(NSMutableDictionary*)options
+{
+    [self performSelector:@selector(doTryLogin:) withObject:options afterDelay:10.0];
+}
+
+- (void)tryLogin:(NSMutableDictionary*)options
+{
+    NSString *domain = [options objectForKey:@"domain"];
+    NSString *protocol = [options objectForKey:@"protocol"];
+    NSString *fullDomain = [NSString stringWithFormat:@"%@://%@", protocol, domain];
+    [self setApiStatus:[NSString stringWithFormat:@"Connecting to %@ ...", domain]];
+    Corellium *corelliumTest = [[Corellium alloc] initWithDomain:fullDomain username:[options objectForKey:@"username"] password:[options objectForKey:@"password"]];
+    NSError *err = nil;
+    if (![corelliumTest login:&err]) {
+        [self setApiStatus:@""];
+        if (err.code == NSURLErrorTimedOut && ![[options objectForKey:@"onError"] isEqualToString:@"runConfigureDomain"]) {
+            [self setApiStatus:[NSString stringWithFormat:@"Timeout while connecting to %@", domain]];
+            [self performSelectorOnMainThread:@selector(timeoutRetryLogin:) withObject:options waitUntilDone:NO];
+        } else {
+            NSAlert *alert = [[NSAlert alloc] init];
+            [alert setMessageText:[NSString stringWithFormat:@"Login failed at %@", fullDomain]];
+            [alert setInformativeText:@"Make sure domain name and credentials are correct"];
+            [alert setAlertStyle:NSAlertStyleCritical];
+            [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
+            SEL sel = NSSelectorFromString([options objectForKey:@"onError"]);
+            if (sel) {
+                [self performSelectorOnMainThread:sel withObject:options waitUntilDone:NO];
+            }
+        }
+        return;
+    } else {
+        [self setApiStatus:@""];
+        NSString *username = [options objectForKey:@"username"];
+        NSString *password = [options objectForKey:@"password"];
+        CFStringRef proto = nil;
+        if ([protocol isEqualToString:@"https"]) {
+            proto = kSecAttrProtocolHTTPS;
+        } else if ([protocol isEqualToString:@"http:"]) {
+            proto = kSecAttrProtocolHTTP;
+        }
+        
+        CFTypeRef check_keys[] = { kSecClass, kSecAttrServer, kSecAttrProtocol, kSecMatchLimit, kSecReturnData, kSecReturnAttributes };
+        CFTypeRef check_values[] = { kSecClassInternetPassword, (__bridge CFStringRef)domain, proto, kSecMatchLimitOne, kCFBooleanTrue, kCFBooleanTrue };
+        CFDictionaryRef query = CFDictionaryCreate(kCFAllocatorDefault, check_keys, check_values, 6, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFTypeRef pwData = NULL;
+        OSStatus status = SecItemCopyMatching(query, &pwData);
+        CFRelease(query);
+        if (status == errSecSuccess) {
+            /* item already present in keychain, check if we need to update it */
+            NSDictionary *creds = (__bridge NSDictionary*)pwData;
+            NSString *old_username = [creds objectForKey:(__bridge NSString*)kSecAttrAccount];
+            NSData *passwd = [creds objectForKey:(__bridge NSString*)kSecValueData];
+            NSString *old_password = (passwd) ? [[NSString alloc] initWithData:passwd encoding:NSUTF8StringEncoding] : nil;
+            CFRelease(pwData);
+            if (![username isEqualToString:old_username] || ![password isEqualToString:old_password]) {
+                /* update with new credentials */
+                CFDictionaryRef update_query = CFDictionaryCreate(kCFAllocatorDefault, check_keys, check_values, 4, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                NSData *d_passwd =[password dataUsingEncoding:NSUTF8StringEncoding];
+                CFTypeRef values[] = { (__bridge CFStringRef)username, (__bridge CFDataRef)d_passwd };
+                CFTypeRef keys[] = { kSecAttrAccount, kSecValueData };
+                CFDictionaryRef update_data = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                status = SecItemUpdate(update_query, update_data);
+                CFRelease(update_data);
+                CFRelease(update_query);
+                if (status != errSecSuccess) {
+                    NSAlert *alert = [[NSAlert alloc] init];
+                    [alert setMessageText:[NSString stringWithFormat:@"Failed to update credentials in keychain (error %d)", status]];
+                    [alert setAlertStyle:NSAlertStyleCritical];
+                    [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
+                    return;
+                }
+            }
+            CFPreferencesSetAppValue(CFSTR("Domain"), (__bridge CFStringRef)fullDomain, APPID);
+            CFPreferencesAppSynchronize(APPID);
+        } else {
+            /* not present, create new item in keychain */
+            NSData *d_passwd =[password dataUsingEncoding:NSUTF8StringEncoding];
+            CFTypeRef values[] = { kSecClassInternetPassword, (__bridge CFStringRef)domain, proto, (__bridge CFStringRef)username, (__bridge CFDataRef)d_passwd };
+            CFTypeRef keys[] = { kSecClass, kSecAttrServer, kSecAttrProtocol, kSecAttrAccount, kSecValueData };
+            CFDictionaryRef attribs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 5, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+            status = SecItemAdd(attribs, NULL);
+            CFRelease(attribs);
+            if (status == errSecSuccess) {
+                CFPreferencesSetAppValue(CFSTR("Domain"), (__bridge CFStringRef)fullDomain, APPID);
+                CFPreferencesAppSynchronize(APPID);
+            } else {
+                NSAlert *alert = [[NSAlert alloc] init];
+                [alert setMessageText:[NSString stringWithFormat:@"Failed to store credentials in keychain (error %d)", status]];
+                [alert setAlertStyle:NSAlertStyleCritical];
+                [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
+                return;
+            }
+        }
+        no_mdns = 1;
+        corellium = corelliumTest;
+        corellium.domain = domain;
+        [self setApiStatus:[NSString stringWithFormat:@"Connected to %@", domain]];
+        [self performSelectorOnMainThread:@selector(startEnumTimer) withObject:nil waitUntilDone:NO];
+        [self performSelectorOnMainThread:@selector(autoStartDaemonIfRequired) withObject:nil waitUntilDone:NO];
+    }
+}
+
+- (void)parseDomain:(NSString*)inStr domainOut:(NSString**)outDomain schemeOut:(NSString**)outScheme
+{
+    NSString *domain = [inStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSRange schemeRange = [domain rangeOfString:@"://"];
+    NSString *scheme = nil;
+    if (schemeRange.location != NSNotFound) {
+        scheme = [domain substringWithRange:NSMakeRange(0, schemeRange.location)];
+        domain = [domain substringFromIndex:schemeRange.location + schemeRange.length];
+    } else {
+        /* default to https */
+        scheme = @"https";
+    }
+    NSRange slashRange = [domain rangeOfString:@"/"];
+    if (slashRange.location != NSNotFound) {
+        domain = [domain substringToIndex:slashRange.location];
+    }
+    *outDomain = domain;
+    *outScheme = scheme;
+}
+
+- (void)runConfigureDomain:(NSMutableDictionary*)options
+{
+    [self performSelector:@selector(configureDomain) withObject:nil afterDelay:0.3];
+}
+
+- (void)configureDomain
+{
+    SimpleTextInput *domainEntry = [[SimpleTextInput alloc] init];
+    [domainEntry setMessageText:@"Enter Corellium domain"];
+    [domainEntry setInformativeText:@"https: will be assumed if not specified"];
+    [domainEntry setPlaceholder:@"https://hostname.domain.com"];
+    if ([domainEntry runModal] == NSAlertFirstButtonReturn) {
+        if ([self isRunning]) {
+            [NSThread detachNewThreadSelector:@selector(stopUSBFluxDaemon) toTarget:self withObject:nil];
+        }
+        if ([[domainEntry textValue] isCaseInsensitiveLike:@"none"]) {
+            corellium = nil;
+            [enumTimer invalidate];
+            [self setApiStatus:@""];
+            CFPreferencesSetAppValue(CFSTR("Domain"), CFSTR(""), APPID);
+            CFPreferencesAppSynchronize(APPID);
+            no_mdns = 0;
+            return;
+        }
+        autostart_after_config = YES;
+        NSString *scheme = nil;
+        NSString *domain = nil;
+        [self parseDomain:[domainEntry textValue] domainOut:&domain schemeOut:&scheme];
+        if (![scheme isEqualToString:@"https"] && ![scheme isEqualToString:@"http"]) {
+            NSAlert *alert = [[NSAlert alloc] init];
+            [alert setMessageText:[NSString stringWithFormat:@"Unsupported protocol '%@'", scheme]];
+            [alert setInformativeText:@"Make sure domain name is correct."];
+            [alert setAlertStyle:NSAlertStyleCritical];
+            [alert runModal];
+            [self performSelector:@selector(configureDomain) withObject:nil afterDelay:0.3];
+            return;
+        }
+
+        PasswordEntry *pwprompt = [[PasswordEntry alloc] init];
+        [pwprompt setInformativeText:[NSString stringWithFormat:@"Domain: %@://%@", scheme, domain]];
+        if ([pwprompt runModal] == NSAlertFirstButtonReturn) {
+            if ([self isRunning]) {
+                [NSThread detachNewThreadSelector:@selector(stopUSBFluxDaemon) toTarget:self withObject:nil];
+            }
+            corellium = nil;
+            [enumTimer invalidate];
+            [self setApiStatus:@""];
+            /*if (usbfluxd_running) {
+                NSDictionary *instances = [self getInstances];
+                for (NSString *key in instances) {
+                    NSDictionary *entry = [instances objectForKey:key];
+                    if (![[entry objectForKey:@"IsUnix"] boolValue]) {
+                        NSString *host = [entry objectForKey:@"Host"];
+                        unsigned int port = [[entry objectForKey:@"Port"] intValue];
+                        [self removeInstance:host port:port];
+                    }
+                }
+            }*/
+            NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
+            [options setObject:domain forKey:@"domain"];
+            [options setObject:scheme forKey:@"protocol"];
+            [options setObject:[pwprompt userValue] forKey:@"username"];
+            [options setObject:[pwprompt passValue] forKey:@"password"];
+            [options setObject:@"runConfigureDomain:" forKey:@"onError"];
+            [NSThread detachNewThreadSelector:@selector(tryLogin:) toTarget:self withObject:options];
+        }
+    }
+}
+
+- (void)runTryLogin:(NSMutableDictionary*)options
+{
+    [options removeObjectForKey:@"password"];
+    [self performSelector:@selector(doTryLogin:) withObject:options afterDelay:0.3];
+}
+
+- (void)doTryLogin:(NSMutableDictionary*)options
+{
+    NSString *domain = [options objectForKey:@"domain"];
+    NSString *scheme = [options objectForKey:@"protocol"];
+    NSString *username = [options objectForKey:@"username"];
+    NSString *password = [options objectForKey:@"password"];
+    if (!username || !password) {
+        PasswordEntry *pwprompt = [[PasswordEntry alloc] init];
+        [pwprompt setInformativeText:[NSString stringWithFormat:@"Domain: %@://%@", scheme, domain]];
+        [pwprompt setUserValue:username];
+        if ([pwprompt runModal] == NSAlertFirstButtonReturn) {
+            username = [pwprompt userValue];
+            password = [pwprompt passValue];
+        } else {
+            username = nil;
+            password = nil;
+        }
+    }
+    if (!username || !password) {
+        return;
+    }
+    
+    [options setObject:username forKey:@"username"];
+    [options setObject:password forKey:@"password"];
+
+    [NSThread detachNewThreadSelector:@selector(tryLogin:) toTarget:self withObject:options];
+}
+
+- (IBAction)preferencesClicked:(id)sender
+{
+    [self configureDomain];
+}
+
+- (void)autoStartDaemonIfRequired
+{
+    CFPreferencesAppSynchronize(APPID);
+    Boolean existsAndValid = NO;
+    Boolean shouldAutoStart = CFPreferencesGetAppBooleanValue(CFSTR("AutoStart"), APPID, &existsAndValid);
+    if (existsAndValid && shouldAutoStart) {
+        self.cbAutoStart.state = NSControlStateValueOn;
+    }
+    if (autostart_after_config || (existsAndValid && shouldAutoStart)) {
+        if (![self isRunning]) {
+            self.cbAutoStart.focusRingType = NSFocusRingTypeNone;
+            self.startStopButton.enabled = NO;
+            [NSThread detachNewThreadSelector:@selector(startUSBFluxDaemon) toTarget:self withObject:nil];
+        }
+    }
+}
+
+- (void)startCheckTimer
+{
+    [self checkStatus:nil];
+    checkTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(checkStatus:) userInfo:nil repeats:YES];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
     [[NSApp mainWindow] setDelegate:self];
     self.cbAutoStart.focusRingType = NSFocusRingTypeNone;
+
+    CFPreferencesAppSynchronize(APPID);
+    
+    Boolean existsAndValid = NO;
+    Boolean shouldAutoStart = CFPreferencesGetAppBooleanValue(CFSTR("AutoStart"), APPID, &existsAndValid);
+    if (existsAndValid && shouldAutoStart) {
+        self.cbAutoStart.state = NSControlStateValueOn;
+    }
+
     NSString *usbfluxdPath = [[NSBundle mainBundle] pathForResource:@"usbfluxd" ofType:nil];
     if (![[NSFileManager defaultManager] fileExistsAtPath:usbfluxdPath]) {
         usbfluxd_path = NULL;
@@ -536,19 +892,138 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
         terminate_path = strdup([terminatePath fileSystemRepresentation]);
     }
     if (usbfluxd_path && terminate_path) {
-        [self checkStatus:nil];
-        checkTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(checkStatus:) userInfo:nil repeats:YES];
-
-        CFPreferencesAppSynchronize(CFSTR("com.corellium.USBFlux"));
-        Boolean existsAndValid = NO;
-        Boolean shouldAutoStart = CFPreferencesGetAppBooleanValue(CFSTR("AutoStart"), CFSTR("com.corellium.USBFlux"), &existsAndValid);
-        if (existsAndValid && shouldAutoStart) {
-            self.cbAutoStart.state = NSControlStateValueOn;
-            if (![self isRunning]) {
-                self.startStopButton.enabled = NO;
-                [NSThread detachNewThreadSelector:@selector(startUSBFluxDaemon) toTarget:self withObject:nil];
+        CFStringRef usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
+        NSString *domainConf = [[NSBundle mainBundle] pathForResource:@"domain" ofType:@"conf"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:domainConf]) {
+            NSDictionary *fileAttr = [[NSFileManager defaultManager] attributesOfItemAtPath:domainConf error:nil];
+            NSDate *domainConfModTime = [fileAttr objectForKey:NSFileModificationDate];
+            CFPreferencesAppSynchronize(APPID);
+            CFDateRef domainConfigTime = CFPreferencesCopyAppValue(CFSTR("DomainConfigured"), APPID);
+            if (!domainConfigTime || [domainConfModTime timeIntervalSinceDate:(__bridge NSDate*)domainConfigTime] > 0) {
+                /* load config from file */
+                NSDictionary *domainConfig = nil;
+                @try {
+                    domainConfig = [[NSDictionary alloc] initWithContentsOfFile:domainConf];
+                } @catch (NSException *e) { }
+                if (domainConfig) {
+                    Boolean autoStart = [[domainConfig objectForKey:@"AutoStart"] boolValue];
+                    if (autoStart) {
+                        CFPreferencesSetAppValue(CFSTR("AutoStart"), (autoStart) ? kCFBooleanTrue :  kCFBooleanFalse, APPID);
+                    }
+                    NSString *domain = [domainConfig objectForKey:@"Domain"];
+                    if (domain) {
+                        CFPreferencesSetAppValue(CFSTR("Domain"), (__bridge CFStringRef)domain, APPID);
+                    }
+                } else {
+                    CFPreferencesSetAppValue(CFSTR("Domain"), nil, APPID);
+                }
+                CFPreferencesSetAppValue(CFSTR("DomainConfigured"), (__bridge CFDateRef)[NSDate date], APPID);
+                CFPreferencesAppSynchronize(APPID);
+            }
+            if (domainConfigTime) {
+                CFRelease(domainConfigTime);
+            }
+        } else {
+            if (!usbfluxDomain) {
+                CFPreferencesSetAppValue(CFSTR("Domain"), CFSTR(""), APPID);
+                CFPreferencesAppSynchronize(APPID);
             }
         }
+        
+        usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
+        if (!usbfluxDomain) {
+            NSAlert *alert = [[NSAlert alloc] init];
+            [alert setMessageText:@"No domain has been configured yet. Do you want to configure it now?"];
+            [alert setInformativeText:@"A domain must be configured to allow automatic lookup of remote virtual devices."];
+            NSButton *yesBtn = [alert addButtonWithTitle:@"Yes"];
+            NSButton *laterBtn = [alert addButtonWithTitle:@"Not now"];
+            NSButton *neverBtn = [alert addButtonWithTitle:@"Do not ask again"];
+            [[alert window] setInitialFirstResponder:yesBtn];
+            [laterBtn setKeyEquivalent:@"\033"];
+            [neverBtn setKeyEquivalentModifierMask:NSEventModifierFlagOption];
+            [neverBtn setKeyEquivalent:@"\033"];
+            NSModalResponse mr = [alert runModal];
+            if (mr == NSAlertFirstButtonReturn) {
+                /* yes! */
+                [self configureDomain];
+            } else if (mr == NSAlertSecondButtonReturn) {
+                /* not now */
+                no_mdns = 0;
+                [self autoStartDaemonIfRequired];
+            } else {
+                /* don't ask again */
+                CFPreferencesSetAppValue(CFSTR("Domain"), CFSTR(""), APPID);
+                CFPreferencesAppSynchronize(APPID);
+                no_mdns = 0;
+                [self autoStartDaemonIfRequired];
+            }
+            [self startCheckTimer];
+            return;
+        }
+        
+        if (CFEqual(usbfluxDomain, CFSTR(""))) {
+            /* mDNS mode */
+            CFRelease(usbfluxDomain);
+            no_mdns = 0;
+            [self autoStartDaemonIfRequired];
+            [self startCheckTimer];
+            return;
+        }
+        
+        no_mdns = 1;
+        if ([self isRunning]) {
+            [NSThread detachNewThreadSelector:@selector(stopUSBFluxDaemon) toTarget:self withObject:nil];
+        }
+
+        [self startCheckTimer];
+
+        NSString *domain = nil;
+        NSString *scheme = nil;
+        [self parseDomain:(__bridge NSString*)usbfluxDomain domainOut:&domain schemeOut:&scheme];
+        CFRelease(usbfluxDomain);
+        
+        CFStringRef proto = nil;
+        if ([scheme isEqualToString:@"https"]) {
+            proto = kSecAttrProtocolHTTPS;
+        } else if ([scheme isEqualToString:@"http:"]) {
+            proto = kSecAttrProtocolHTTP;
+        }
+        if (!proto) {
+            CFPreferencesSetAppValue(CFSTR("Domain"), nil, APPID);
+            CFPreferencesAppSynchronize(APPID);
+            NSAlert *alert = [[NSAlert alloc] init];
+            [alert setMessageText:[NSString stringWithFormat:@"Unsupported protocol '%@'", scheme]];
+            [alert setInformativeText:@"Please restart the app to reconfigure."];
+            [alert setAlertStyle:NSAlertStyleCritical];
+            [alert runModal];
+            return;
+        }
+        
+        CFTypeRef check_keys[] = { kSecClass, kSecAttrServer, kSecAttrProtocol, kSecMatchLimit, kSecReturnData, kSecReturnAttributes };
+        CFTypeRef check_values[] = { kSecClassInternetPassword, (__bridge CFStringRef)domain, proto, kSecMatchLimitOne, kCFBooleanTrue, kCFBooleanTrue };
+        CFDictionaryRef query = CFDictionaryCreate(kCFAllocatorDefault, check_keys, check_values, 6, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFTypeRef pwData = NULL;
+        OSStatus status = SecItemCopyMatching(query, &pwData);
+        CFRelease(query);
+        NSString *username = nil;
+        NSString *password = nil;
+        if (status == errSecSuccess) {
+            NSDictionary *creds = (__bridge NSDictionary*)pwData;
+            username = [creds objectForKey:(__bridge NSString*)kSecAttrAccount];
+            NSData *passwd = [creds objectForKey:(__bridge NSString*)kSecValueData];
+            password = (passwd) ? [[NSString alloc] initWithData:passwd encoding:NSUTF8StringEncoding] : nil;
+        }
+        if (pwData) {
+            CFRelease(pwData);
+        }
+        
+        NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
+        [options setObject:domain forKey:@"domain"];
+        [options setObject:scheme forKey:@"protocol"];
+        if (username) [options setObject:username forKey:@"username"];
+        if (password) [options setObject:password forKey:@"password"];
+        [options setObject:@"runTryLogin:" forKey:@"onError"];
+        [self doTryLogin:options];
     }
 }
 
@@ -604,7 +1079,7 @@ static int get_process_list(struct kinfo_proc **procList, size_t *procCount)
 
 -(IBAction)autoStartClicked:(id)sender
 {
-    CFPreferencesSetAppValue(CFSTR("AutoStart"), (self.cbAutoStart.state == NSControlStateValueOn) ? kCFBooleanTrue : kCFBooleanFalse, CFSTR("com.corellium.USBFlux"));
-    CFPreferencesAppSynchronize(CFSTR("com.corellium.USBFlux"));
+    CFPreferencesSetAppValue(CFSTR("AutoStart"), (self.cbAutoStart.state == NSControlStateValueOn) ? kCFBooleanTrue : kCFBooleanFalse, APPID);
+    CFPreferencesAppSynchronize(APPID);
 }
 @end
