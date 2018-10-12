@@ -268,19 +268,23 @@ static int notify_parent(int status)
 	return 0;
 }
 
-static void usage()
+static void print_usage(int argc, char **argv, int is_error)
 {
-	printf("Usage: %s [OPTIONS]\n", PACKAGE_NAME);
-	printf("Redirects the standard usbmuxd socket to allow connections to local and\n");
-	printf("remote usbmuxd instances so remote devices appear connected locally.\n\n");
-	printf("  -h, --help\t\tPrint this message.\n");
-	printf("  -v, --verbose\t\tBe verbose (use twice or more to increase).\n");
-	printf("  -f, --foreground\tDo not daemonize (implies one -v).\n");
-	printf("  -r, --remote\t\tConnect to the specified remote usbmuxd, specified as host:port.\n");
-	printf("  -n, --no-usbmuxd\tRun even if local usbmuxd is not available.\n");
-	printf("  -m, --no-mdns\tDisable automatic detection via mDNS.\n");
-	printf("  -V, --version\t\tPrint version information and exit.\n");
-	printf("\n");
+	char *name = NULL;
+	name = strrchr(argv[0], '/');
+	fprintf(is_error ? stderr : stdout, "Usage: %s [OPTIONS]\n", (name ? name + 1 : argv[0]));
+	fprintf(is_error ? stderr : stdout,
+	  "Redirects the standard usbmuxd socket to allow connections to local and\n" \
+	  "remote usbmuxd instances so remote devices appear connected locally.\n\n" \
+	  "  -h, --help\t\tPrint this message.\n" \
+	  "  -v, --verbose\t\tBe verbose (use twice or more to increase).\n" \
+	  "  -f, --foreground\tDo not daemonize (implies one -v).\n" \
+	  "  -r, --remote\t\tConnect to the specified remote usbmuxd, specified as host:port.\n" \
+	  "  -n, --no-usbmuxd\tRun even if local usbmuxd is not available.\n" \
+	  "  -m, --no-mdns\tDisable automatic detection via mDNS.\n" \
+	  "  -V, --version\t\tPrint version information and exit.\n" \
+	  "\n"
+	);
 }
 
 static void parse_opts(int argc, char **argv)
@@ -307,7 +311,7 @@ static void parse_opts(int argc, char **argv)
 
 		switch (c) {
 		case 'h':
-			usage();
+			print_usage(argc, argv, 0);
 			exit(0);
 		case 'f':
 			foreground = 1;
@@ -339,7 +343,7 @@ static void parse_opts(int argc, char **argv)
 			break;
 		}
 		default:
-			usage();
+			print_usage(argc, argv, 1);
 			exit(2);
 		}
 	}
