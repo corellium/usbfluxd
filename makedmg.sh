@@ -34,7 +34,15 @@ if test -f USBFlux.pdf; then
   cp USBFlux.pdf ${SRCDIR}/
 fi
 
-rm -f $PKGNAME-$COMMIT.dmg
+DMG_NAME_MDNS=$PKGNAME-$COMMIT.dmg
+ZIP_NAME_MDNS=$PKGNAME-$COMMIT.zip
+DMG_NAME_API=$PKGNAME-onsite-$COMMIT.dmg
+ZIP_NAME_API=$PKGNAME-onsite-$COMMIT.zip
+
+rm -f $DMG_NAME_MDNS
+rm -f $ZIP_NAME_MDNS
+rm -f $DMG_NAME_API
+rm -f $ZIP_NAME_API
 
 if ! test -x create-dmg/create-dmg; then
 	rm -rf create-dmg
@@ -46,14 +54,22 @@ if ! test -x create-dmg/create-dmg; then
 	cd "$THISDIR"
 fi
 
-./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 --icon USBFlux.pdf 0 200 $PKGNAME-$COMMIT.dmg ${SRCDIR}
+./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 --icon USBFlux.pdf 0 200 $DMG_NAME_MDNS ${SRCDIR}
 
-rm -f $PKGNAME-$COMMIT.zip
-
-cd USBFlux/build/Release
-zip -r "$THISDIR/$PKGNAME-$COMMIT.zip" USBFlux.app
+cd "${SRCDIR}"
+zip -r "$THISDIR/$ZIP_NAME_MDNS" USBFlux.app
 cd "$THISDIR"
-zip "$PKGNAME-$COMMIT.zip" README README.md
+zip "$ZIP_NAME_MDNS" README README.md
+
+# copy domain configuration file
+cp domain.conf $SRCDIR/USBFlux.app/Contents/Resources/domain.conf
+
+./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 --icon USBFlux.pdf 0 200 $DMG_NAME_API ${SRCDIR}
+
+cd "${SRCDIR}"
+zip -r "$THISDIR/$ZIP_NAME_API" USBFlux.app
+cd "$THISDIR"
+zip "$ZIP_NAME_API" README README.md
 
 rm -rf ${SRCDIR}
 
