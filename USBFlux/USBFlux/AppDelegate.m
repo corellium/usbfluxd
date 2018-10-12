@@ -892,7 +892,7 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
         terminate_path = strdup([terminatePath fileSystemRepresentation]);
     }
     if (usbfluxd_path && terminate_path) {
-        CFStringRef usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
+        CFStringRef usbfluxDomain = nil;
         NSString *domainConf = [[NSBundle mainBundle] pathForResource:@"domain" ofType:@"conf"];
         if ([[NSFileManager defaultManager] fileExistsAtPath:domainConf]) {
             NSDictionary *fileAttr = [[NSFileManager defaultManager] attributesOfItemAtPath:domainConf error:nil];
@@ -914,8 +914,14 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
                     if (domain) {
                         CFPreferencesSetAppValue(CFSTR("Domain"), (__bridge CFStringRef)domain, APPID);
                     }
-                } else {
+                }
+                usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
+                if (!usbfluxDomain || CFEqual((usbfluxDomain), CFSTR(""))) {
                     CFPreferencesSetAppValue(CFSTR("Domain"), nil, APPID);
+                    if (usbfluxDomain) {
+                        CFRelease(usbfluxDomain);
+                        usbfluxDomain = nil;
+                    }
                 }
                 CFPreferencesSetAppValue(CFSTR("DomainConfigured"), (__bridge CFDateRef)[NSDate date], APPID);
                 CFPreferencesAppSynchronize(APPID);
@@ -924,13 +930,16 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
                 CFRelease(domainConfigTime);
             }
         } else {
+            usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
             if (!usbfluxDomain) {
                 CFPreferencesSetAppValue(CFSTR("Domain"), CFSTR(""), APPID);
                 CFPreferencesAppSynchronize(APPID);
             }
         }
-        
-        usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
+
+        if (!usbfluxDomain) {
+            usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
+        }
         if (!usbfluxDomain) {
             NSAlert *alert = [[NSAlert alloc] init];
             [alert setMessageText:@"No domain has been configured yet. Do you want to configure it now?"];
