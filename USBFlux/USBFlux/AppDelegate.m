@@ -996,9 +996,12 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
         CFStringRef proto = nil;
         if ([scheme isEqualToString:@"https"]) {
             proto = kSecAttrProtocolHTTPS;
-        } else if ([scheme isEqualToString:@"http:"]) {
+        } else if ([scheme isEqualToString:@"http"]) {
             proto = kSecAttrProtocolHTTP;
+        } else {
+            proto = kSecAttrProtocolHTTPS;
         }
+
         if (!proto) {
             CFPreferencesSetAppValue(CFSTR("Domain"), nil, APPID);
             CFPreferencesAppSynchronize(APPID);
