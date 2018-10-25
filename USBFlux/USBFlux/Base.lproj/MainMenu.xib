@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="14313.18" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="14109" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="14313.18"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="14109"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
@@ -74,32 +74,32 @@
                         </items>
                     </menu>
                 </menuItem>
-                <menuItem title="Edit" id="vKA-Iq-Cbp">
+                <menuItem title="Edit" hidden="YES" id="vKA-Iq-Cbp">
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <menu key="submenu" title="Edit" id="w4e-bw-oLy">
                         <items>
-                            <menuItem title="Undo" keyEquivalent="z" id="Gk3-uC-bU7">
+                            <menuItem title="Undo" keyEquivalent="z" allowsKeyEquivalentWhenHidden="YES" id="Gk3-uC-bU7">
                                 <connections>
                                     <action selector="undo:" target="-1" id="hCO-ew-GuK"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Redo" keyEquivalent="Z" id="tfi-ef-msX">
+                            <menuItem title="Redo" keyEquivalent="Z" allowsKeyEquivalentWhenHidden="YES" id="tfi-ef-msX">
                                 <connections>
                                     <action selector="redo:" target="-1" id="bmo-b2-euW"/>
                                 </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="3fv-uf-4Cf"/>
-                            <menuItem title="Cut" keyEquivalent="x" id="CTd-Wp-NG8">
+                            <menuItem title="Cut" keyEquivalent="x" allowsKeyEquivalentWhenHidden="YES" id="CTd-Wp-NG8">
                                 <connections>
                                     <action selector="cut:" target="-1" id="N9t-rG-jku"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Copy" keyEquivalent="c" id="NWQ-Hp-hNI">
+                            <menuItem title="Copy" keyEquivalent="c" allowsKeyEquivalentWhenHidden="YES" id="NWQ-Hp-hNI">
                                 <connections>
                                     <action selector="copy:" target="-1" id="Lix-53-Dch"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Paste" keyEquivalent="v" id="06h-VK-ieX">
+                            <menuItem title="Paste" keyEquivalent="v" allowsKeyEquivalentWhenHidden="YES" id="06h-VK-ieX">
                                 <connections>
                                     <action selector="paste:" target="-1" id="YQ5-DP-l4U"/>
                                 </connections>
@@ -116,7 +116,7 @@
                                     <action selector="delete:" target="-1" id="9i5-lR-rxr"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Select All" keyEquivalent="a" id="4wx-GZ-7wK">
+                            <menuItem title="Select All" keyEquivalent="a" allowsKeyEquivalentWhenHidden="YES" id="4wx-GZ-7wK">
                                 <connections>
                                     <action selector="selectAll:" target="-1" id="ObI-RJ-VPH"/>
                                 </connections>
@@ -299,7 +299,7 @@
         <window title="USBFlux" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" releasedWhenClosed="NO" animationBehavior="default" id="QvC-M9-y7g">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES"/>
             <rect key="contentRect" x="335" y="390" width="354" height="160"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="1680" height="1027"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="3440" height="1417"/>
             <view key="contentView" wantsLayer="YES" id="EiT-Mj-1SZ">
                 <rect key="frame" x="0.0" y="0.0" width="354" height="160"/>
                 <autoresizingMask key="autoresizingMask"/>
