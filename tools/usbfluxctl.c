@@ -308,6 +308,24 @@ static int handle_del(const char *arg)
 	return result;
 }
 
+static int handle_listeners()
+{
+	char req_xml[] = "<plist version=\"1.0\"><dict><key>MessageType</key><string>ListListeners</string></dict></plist>";
+
+	plist_t pl = usbfluxd_query(req_xml);
+	if (pl) {
+		char *xml = NULL;
+		uint32_t xlen = 0;
+		plist_to_xml(pl, &xml, &xlen);
+		puts(xml);
+		free(xml);
+	} else {
+		printf("uh\n");
+	}
+
+	return 0;
+}
+
 static void print_usage(const char *argv0)
 {
 	const char *cmd = strrchr(argv0, '/');
@@ -340,6 +358,8 @@ int main(int argc, char **argv)
 		result = handle_del(argv[2]);
 	} else if (strcmp(argv[1], "list") == 0) {
 		result = handle_list(argv[2]);
+	} else if (strcmp(argv[1], "listeners") == 0) {
+		result = handle_listeners();
 	} else {
 		print_usage(argv[0]);
 		return -1;
