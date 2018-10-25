@@ -638,8 +638,10 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
         CFStringRef proto = nil;
         if ([protocol isEqualToString:@"https"]) {
             proto = kSecAttrProtocolHTTPS;
-        } else if ([protocol isEqualToString:@"http:"]) {
+        } else if ([protocol isEqualToString:@"http"]) {
             proto = kSecAttrProtocolHTTP;
+        } else {
+            proto = kSecAttrProtocolHTTPS;
         }
         
         CFTypeRef check_keys[] = { kSecClass, kSecAttrServer, kSecAttrProtocol, kSecMatchLimit, kSecReturnData, kSecReturnAttributes };
