@@ -24,6 +24,12 @@
     }
     
     inputField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 32, 200, 24)];
+    if (@available(macOS 10.10, *)) {
+        [inputField setLineBreakMode:NSLineBreakByTruncatingHead];
+    } else {
+        [inputField.cell setWraps:NO];
+        [inputField.cell setScrollable:YES];
+    }
     [inputField setStringValue:@""];
     [inputField setDelegate:self];
     okBtn = [self addButtonWithTitle:@"OK"];

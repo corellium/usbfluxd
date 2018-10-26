@@ -27,11 +27,23 @@
     [self setMessageText:@"Enter username and password"];
     NSView *group = [[NSView alloc] initWithFrame:NSMakeRect(0,0,200,60)];
     inputUser = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 32, 200, 24)];
+    if (@available(macOS 10.10, *)) {
+        [inputUser setLineBreakMode:NSLineBreakByTruncatingHead];
+    } else {
+        [inputUser.cell setWraps:NO];
+        [inputUser.cell setScrollable:YES];
+    }
     [inputUser setStringValue:@""];
     if (@available(macOS 10.10, *)) {
         [inputUser setPlaceholderString:@"username"];
     }
     inputPass = [[NSSecureTextField alloc] initWithFrame:NSMakeRect(0, 0, 200, 24)];
+    if (@available(macOS 10.10, *)) {
+        [inputPass setLineBreakMode:NSLineBreakByTruncatingHead];
+    } else {
+        [inputPass.cell setWraps:NO];
+        [inputPass.cell setScrollable:YES];
+    }
     [inputPass setStringValue:@""];
     if (@available(macOS 10.10, *)) {
         [inputPass setPlaceholderString:@"password"];
