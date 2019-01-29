@@ -43,7 +43,8 @@ Build Requirements
 ==================
 
 Development Packages of:
-	libplist
+	libplist-dev
+	libavahi-client-dev
 
 Software:
 	make

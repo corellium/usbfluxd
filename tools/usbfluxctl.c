@@ -8,6 +8,13 @@
 #include <sys/un.h>
 #include <plist/plist.h>
 
+#define _my_PLIST_IS_TYPE(__plist, __plist_type) (__plist && (plist_get_node_type(__plist) == PLIST_##__plist_type))
+#define _my_PLIST_IS_DICT(__plist)    _my_PLIST_IS_TYPE(__plist, DICT)
+#define _my_PLIST_IS_BOOLEAN(__plist) _my_PLIST_IS_TYPE(__plist, BOOLEAN)
+#define _my_PLIST_IS_UINT(__plist) _my_PLIST_IS_TYPE(__plist, UINT)
+#define _my_PLIST_IS_STRING(__plist) _my_PLIST_IS_TYPE(__plist, STRING)
+
+
 struct usbmuxd_header {
 	uint32_t length;	// length of message, including header
 	uint32_t version;   // protocol version
@@ -59,10 +66,10 @@ static int socket_connect_unix(const char *filename)
 
 static uint8_t plist_dict_get_bool_val(plist_t dict, const char *key)
 {
-	if (!dict || !PLIST_IS_DICT(dict) || !key) return 0;
+	if (!dict || !_my_PLIST_IS_DICT(dict) || !key) return 0;
 
 	plist_t node = plist_dict_get_item(dict, key);
-	if (!node || !PLIST_IS_BOOLEAN(node)) return 0;
+	if (!node || !_my_PLIST_IS_BOOLEAN(node)) return 0;
 
 	uint8_t val = 0;
 	plist_get_bool_val(node, &val);
@@ -72,10 +79,10 @@ static uint8_t plist_dict_get_bool_val(plist_t dict, const char *key)
 
 static uint64_t plist_dict_get_uint_val(plist_t dict, const char *key)
 {
-	if (!dict || !PLIST_IS_DICT(dict) || !key) return 0;
+	if (!dict || !_my_PLIST_IS_DICT(dict) || !key) return 0;
 
 	plist_t node = plist_dict_get_item(dict, key);
-	if (!node || !PLIST_IS_UINT(node)) return 0;
+	if (!node || !_my_PLIST_IS_UINT(node)) return 0;
 
 	uint64_t val = 0;
 	plist_get_uint_val(node, &val);
@@ -85,10 +92,10 @@ static uint64_t plist_dict_get_uint_val(plist_t dict, const char *key)
 
 static char *plist_dict_get_string_val(plist_t dict, const char *key)
 {
-	if (!dict || !PLIST_IS_DICT(dict) || !key) return NULL;
+	if (!dict || !_my_PLIST_IS_DICT(dict) || !key) return NULL;
 
 	plist_t node = plist_dict_get_item(dict, key);
-	if (!node || !PLIST_IS_STRING(node)) return NULL;
+	if (!node || !_my_PLIST_IS_STRING(node)) return NULL;
 
 	char *val = NULL;
 	plist_get_string_val(node, &val);
