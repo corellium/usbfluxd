@@ -43,3 +43,4 @@ USBFlux/USBFlux.xcodeproj/xcuserdata/
 *.zip
 *.dmg
 create-dmg
+.DS_Store
