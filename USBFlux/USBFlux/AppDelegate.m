@@ -33,7 +33,10 @@ static AuthorizationRef authorization = nil;
     int usbfluxd_running;
     int no_mdns;
     BOOL autostart_after_config;
+    BOOL onSite;
 }
+@property (weak) IBOutlet NSMenuItem *preferencesSeparator;
+@property (weak) IBOutlet NSMenuItem *preferencesItem;
 @property (weak) IBOutlet NSTextField *statusLabel;
 @property (weak) IBOutlet NSTextField *detailLabel;
 @property (weak) IBOutlet NSTextField *apiLabel;
@@ -897,6 +900,7 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
         CFStringRef usbfluxDomain = nil;
         NSString *domainConf = [[NSBundle mainBundle] pathForResource:@"domain" ofType:@"conf"];
         if ([[NSFileManager defaultManager] fileExistsAtPath:domainConf]) {
+            onSite = YES;
             NSDictionary *fileAttr = [[NSFileManager defaultManager] attributesOfItemAtPath:domainConf error:nil];
             NSDate *domainConfModTime = [fileAttr objectForKey:NSFileModificationDate];
             CFPreferencesAppSynchronize(APPID);
@@ -932,13 +936,17 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
                 CFRelease(domainConfigTime);
             }
         } else {
-            usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
-            if (!usbfluxDomain) {
-                CFPreferencesSetAppValue(CFSTR("Domain"), CFSTR(""), APPID);
-                CFPreferencesAppSynchronize(APPID);
-            }
+            onSite = NO;
+            usbfluxDomain = CFStringCreateCopy(NULL, CFSTR(""));
+            CFPreferencesSetAppValue(CFSTR("Domain"), CFSTR(""), APPID);
+            CFPreferencesAppSynchronize(APPID);
         }
-
+        
+        if (!onSite) {
+            self.preferencesSeparator.hidden = YES;
+            self.preferencesItem.hidden = YES;
+        }
+        
         if (!usbfluxDomain) {
             usbfluxDomain = CFPreferencesCopyAppValue(CFSTR("Domain"), APPID);
         }

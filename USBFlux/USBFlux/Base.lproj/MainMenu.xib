@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="14109" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="14460.31" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="14109"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="14460.31"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
@@ -18,6 +18,8 @@
                 <outlet property="apiLabel" destination="MfX-Id-fp2" id="gQt-mK-6Ij"/>
                 <outlet property="cbAutoStart" destination="DC0-ve-vRy" id="kmJ-Gp-5NA"/>
                 <outlet property="detailLabel" destination="5Se-ij-0GJ" id="vGc-WC-8YA"/>
+                <outlet property="preferencesItem" destination="BOF-NM-1cW" id="cCa-lR-NsP"/>
+                <outlet property="preferencesSeparator" destination="VOq-y0-SEH" id="WSa-LH-cUa"/>
                 <outlet property="startStopButton" destination="EbE-RI-n4V" id="hQy-QU-vm2"/>
                 <outlet property="statusLabel" destination="o7e-6J-Rtn" id="Pl7-Z0-T32"/>
                 <outlet property="window" destination="QvC-M9-y7g" id="gIp-Ho-8D9"/>
