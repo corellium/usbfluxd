@@ -82,6 +82,7 @@ typedef NS_ENUM(NSUInteger, STHTTPRequestCookiesStorage) {
 - (NSString *)curlDescription; // logged when launched with -STHTTPRequestShowCurlDescription 1
 
 - (NSString *)startSynchronousWithError:(NSError **)error;
+- (NSString *)startSynchronousSessionWithError:(NSError **)error;
 - (void)startAsynchronous;
 - (void)cancel;
 

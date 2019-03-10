@@ -623,15 +623,17 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
             [self setApiStatus:[NSString stringWithFormat:@"Timeout while connecting to %@", domain]];
             [self performSelectorOnMainThread:@selector(timeoutRetryLogin:) withObject:options waitUntilDone:NO];
         } else {
-            NSAlert *alert = [[NSAlert alloc] init];
-            [alert setMessageText:[NSString stringWithFormat:@"Login failed at %@", fullDomain]];
-            [alert setInformativeText:@"Make sure domain name and credentials are correct"];
-            [alert setAlertStyle:NSAlertStyleCritical];
-            [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
-            SEL sel = NSSelectorFromString([options objectForKey:@"onError"]);
-            if (sel) {
-                [self performSelectorOnMainThread:sel withObject:options waitUntilDone:NO];
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSAlert *alert = [[NSAlert alloc] init];
+                [alert setMessageText:[NSString stringWithFormat:@"Login failed at %@", fullDomain]];
+                [alert setInformativeText:@"Make sure domain name and credentials are correct"];
+                [alert setAlertStyle:NSAlertStyleCritical];
+                [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
+                SEL sel = NSSelectorFromString([options objectForKey:@"onError"]);
+                if (sel) {
+                    [self performSelectorOnMainThread:sel withObject:options waitUntilDone:NO];
+                }
+            });
         }
         return;
     } else {

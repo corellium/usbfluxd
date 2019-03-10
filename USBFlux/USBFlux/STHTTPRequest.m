@@ -12,6 +12,8 @@
 #error This file must be compiled with ARC. Either turn on ARC for the project or use -fobjc-arc flag
 #endif
 
+#import <Cocoa/Cocoa.h>
+#import <CommonCrypto/CommonDigest.h>
 #import "STHTTPRequest.h"
 
 NSUInteger const kSTHTTPRequestCancellationError = 1;
@@ -952,17 +954,91 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
     });
 }
 
-
-- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
+- (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
 {
     // accept self-signed SSL certificates
-    if([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]){
-        NSURLCredential *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
-        completionHandler(NSURLSessionAuthChallengeUseCredential,credential);
-    } else {
-        completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+    if([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+        OSStatus err;
+        NSURLProtectionSpace *protectionSpace = challenge.protectionSpace;
+        SecTrustRef trust = protectionSpace.serverTrust;
+        SecTrustResultType trustResult;
+        BOOL trusted = NO;
+        
+        err = SecTrustEvaluate(trust, &trustResult);
+        
+        if (trustResult == kSecTrustResultProceed || trustResult == kSecTrustResultUnspecified) {
+            trusted = YES;
+        }
+        
+        if (!trusted) {
+            NSLog(@"Certificate not trusted (yet)");
+            if (SecTrustGetCertificateCount(trust) > 0) {
+                SecCertificateRef cert = SecTrustGetCertificateAtIndex(trust, 0);
+                NSData *certificateData = (NSData *)CFBridgingRelease(SecCertificateCopyData(cert));
+
+                unsigned char result[CC_SHA256_DIGEST_LENGTH];
+                CC_SHA256(certificateData.bytes, (CC_LONG)certificateData.length, result);
+                
+                NSMutableString *fingerprint = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+                for (unsigned int i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) {
+                    [fingerprint appendFormat:@"%02X", result[i]];
+                    if (i != (CC_SHA256_DIGEST_LENGTH - 1))
+                        [fingerprint appendString:@":"];
+                }
+                
+                __block NSModalResponse userReturnCode;
+                
+                dispatch_sync(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        NSAlert *alert = [[NSAlert alloc] init];
+                        [alert addButtonWithTitle:@"Cancel"];
+                        [alert addButtonWithTitle:@"Trust"];
+                        [alert setMessageText:@"Trust this server?"];
+                        [alert setInformativeText:[NSString stringWithFormat:@"This server has a self-signed certificate with a SHA-256 fingerprint of %@. Are you sure you wish to trust this server?", fingerprint]];
+                        [alert setAlertStyle:NSWarningAlertStyle];
+                        [alert beginSheetModalForWindow:[[NSApplication sharedApplication] mainWindow] completionHandler:^(NSModalResponse returnCode) {
+                            userReturnCode = returnCode;
+                            dispatch_semaphore_signal(sema);
+                        }];
+                    });
+                    
+                    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+                });
+
+                if (userReturnCode == NSAlertSecondButtonReturn) {
+                    err = SecCertificateAddToKeychain(cert, NULL);
+                    NSLog(@"SecCertificateAddToKeychain = %d", err);
+                    
+                    NSDictionary* settings = nil;
+                    err = SecTrustSettingsSetTrustSettings(cert, kSecTrustSettingsDomainUser, (__bridge CFTypeRef)(settings));
+                    NSLog(@"SecTrustSettingsSetTrustSettings = %d", err);
+                    
+                    CFArrayRef trustSettings = nil;
+                    err = SecTrustSettingsCopyTrustSettings(cert, kSecTrustSettingsDomainUser, &trustSettings);
+                    NSLog(@"SecTrustSettingsCopyTrustSettings = %d %@", err, trustSettings);
+                    
+                    CFArrayRef certs = CFArrayCreate(kCFAllocatorDefault, (const void**)&cert, 1, &kCFTypeArrayCallBacks);
+                    err = SecTrustSetAnchorCertificates(trust, certs);
+                    CFRelease(certs);
+                    NSLog(@"SecTrustSetAnchorCertificates = %d", err);
+                    
+                    trusted = YES;
+                }
+            }
+        }
+            
+        err = SecTrustEvaluate(trust, &trustResult);
+
+        if (trustResult == kSecTrustResultProceed || trustResult == kSecTrustResultUnspecified) {
+            NSURLCredential *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
+            completionHandler(NSURLSessionAuthChallengeUseCredential,credential);
+            return;
+        }
     }
-    
+            
+    completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
 }
 
 - (void)URLSessionDidFinishEventsForBackgroundURLSession:(NSURLSession *)session NS_AVAILABLE_IOS(7_0) {
