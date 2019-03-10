@@ -7,6 +7,7 @@
 //
 
 #import "Corellium.h"
+#import "STHTTPRequest.h"
 
 @interface Corellium ()
 {
@@ -52,25 +53,24 @@
     [requestDict setObject:username forKey:@"username"];
     [requestDict setObject:password forKey:@"password"];
     
-    NSData *requestData = [NSJSONSerialization dataWithJSONObject:requestDict options:0 error:nil];
-    
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithFormat:@"%@/tokens", endpoint]] cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:10.0];
+    STHTTPRequest *request = [STHTTPRequest requestWithURLString:[NSString stringWithFormat:@"%@/tokens", endpoint]];
     [request setHTTPMethod:@"POST"];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-    [request setValue:[NSString stringWithFormat:@"%lu", [requestData length]] forHTTPHeaderField:@"Content-Length"];
-    [request setHTTPBody:requestData];
-    
-    NSURLResponse *response = nil;
+    [request setHeaderWithName:@"Content-Type" value:@"application/json"];
+    [request setHeaderWithName:@"Accept" value:@"application/json"];
+    request.POSTDictionary = requestDict;
+
+    NSString *response = nil;
     NSError *err = nil;
-    NSData *responseData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&err];
-    if (!responseData) {
+    response = [request startSynchronousWithError:&err];
+    if (!response) {
+        NSLog(@"ERROR: %@", err);
         if (error) {
             *error = err;
         }
         return nil;
     }
-    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&err];
+    
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:[response dataUsingEncoding:NSUTF8StringEncoding] options:0 error:&err];
     if (json && [json objectForKey:@"token"]) {
         token = json;
     } else {
@@ -97,20 +97,21 @@
         return nil;
     }
     
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithFormat:@"%@/projects", endpoint]] cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:10.0];
-    [request setValue:token_token forHTTPHeaderField:@"Authorization"];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-    
-    NSURLResponse *response = nil;
+    STHTTPRequest *request = [STHTTPRequest requestWithURLString:[NSString stringWithFormat:@"%@/projects", endpoint]];
+    [request setHeaderWithName:@"Authorization" value:token_token];
+    [request setHeaderWithName:@"Accept" value:@"application/json"];
+    NSString *response = nil;
     NSError *err = nil;
-    NSData *responseData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&err];
+    response = [request startSynchronousWithError:&err];
+    
     if (err) {
         if (error) {
             *error = err;
         }
         return nil;
     }
-    id json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&err];
+    
+    id json = [NSJSONSerialization JSONObjectWithData:[response dataUsingEncoding:NSUTF8StringEncoding] options:0 error:&err];
     if (!json) {
         NSLog(@"failed to parse response while getting list of projects");
         return nil;
@@ -141,20 +142,21 @@
         return nil;
     }
     
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithFormat:@"%@/instances%@%@", endpoint, (query) ? @"?" : @"", (query) ? query : @""]] cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:10.0];
-    [request setValue:token_token forHTTPHeaderField:@"Authorization"];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+    STHTTPRequest *request = [STHTTPRequest requestWithURLString:[NSString stringWithFormat:@"%@/instances%@%@", endpoint, (query) ? @"?" : @"", (query) ? query : @""]];
+    [request setHeaderWithName:@"Authorization" value:token_token];
+    [request setHeaderWithName:@"Accept" value:@"application/json"];
     
-    NSURLResponse *response = nil;
+    NSString *response = nil;
     NSError *err = nil;
-    NSData *responseData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&err];
+    response = [request startSynchronousWithError:&err];
+    
     if (err) {
         if (error) {
             *error = err;
         }
         return nil;
     }
-    id json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&err];
+    id json = [NSJSONSerialization JSONObjectWithData:[response dataUsingEncoding:NSUTF8StringEncoding] options:0 error:&err];
     if (!json) {
         NSLog(@"failed to parse response while getting list of instances");
         return nil;
