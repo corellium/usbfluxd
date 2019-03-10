@@ -61,7 +61,8 @@
 
     NSString *response = nil;
     NSError *err = nil;
-    response = [request startSynchronousWithError:&err];
+    response = [request startSynchronousSessionWithError:&err];
+    
     if (!response) {
         NSLog(@"ERROR: %@", err);
         if (error) {
@@ -102,7 +103,7 @@
     [request setHeaderWithName:@"Accept" value:@"application/json"];
     NSString *response = nil;
     NSError *err = nil;
-    response = [request startSynchronousWithError:&err];
+    response = [request startSynchronousSessionWithError:&err];
     
     if (err) {
         if (error) {
@@ -148,7 +149,7 @@
     
     NSString *response = nil;
     NSError *err = nil;
-    response = [request startSynchronousWithError:&err];
+    response = [request startSynchronousSessionWithError:&err];
     
     if (err) {
         if (error) {

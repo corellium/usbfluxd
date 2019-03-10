@@ -955,15 +955,13 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
 {
-        SecTrustRef serverTrust = [[challenge protectionSpace] serverTrust];
-        NSURLCredential *serverTrustCredential = [NSURLCredential credentialForTrust:serverTrust];
-        if (completionHandler) {
-            completionHandler(NSURLSessionAuthChallengeUseCredential, serverTrustCredential);
-        } else {
-            [[challenge sender] useCredential:serverTrustCredential
-                   forAuthenticationChallenge:challenge];
-        }
-        
+    // accept self-signed SSL certificates
+    if([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]){
+        NSURLCredential *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
+        completionHandler(NSURLSessionAuthChallengeUseCredential,credential);
+    } else {
+        completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+    }
     
 }
 
@@ -1078,6 +1076,62 @@ didCompleteWithError:(NSError *)error {
     });
 }
 
+- (NSString *)startSynchronousSessionWithError:(NSError **)error
+{
+    NSURLRequest *request = [self prepareURLRequest];
+    __block NSURLResponse   *urlResponse = nil;
+    dispatch_semaphore_t    sem;
+    __block NSData          *result = nil;
+    __block NSError         *blkErr = nil;
+    
+    sem = dispatch_semaphore_create(0);
+    
+    NSURLSessionConfiguration *defaultConfigObject = [NSURLSessionConfiguration defaultSessionConfiguration];
+    NSURLSession *defaultSession = [NSURLSession sessionWithConfiguration:defaultConfigObject delegate:self delegateQueue:nil];
+    
+    [[defaultSession dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *err)
+      {
+          if (err) {
+              blkErr = err;
+          }
+          
+          urlResponse = response;
+          
+          if (err == nil) {
+              result = data;
+          }
+          
+          dispatch_semaphore_signal(sem);
+      }] resume];
+    
+    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+    
+    // If Error, return error
+    if (blkErr) {
+        if (error != NULL) *error = blkErr;
+        return nil;
+    }
+    
+    if (urlResponse)
+    {
+        if([urlResponse isKindOfClass:[NSHTTPURLResponse class]])
+        {
+            NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)urlResponse;
+            self.responseHeaders = [httpResponse allHeaderFields];
+            self.responseStatus = [httpResponse statusCode];
+            self.responseStringEncodingName = [httpResponse textEncodingName];
+        }
+    }
+    
+    self.responseString = [self stringWithData:result encodingName:_responseStringEncodingName];
+    self.responseData = [NSMutableData dataWithData:result];
+    if(self.responseStatus >= 400) {
+        if (error != NULL) *error = [self errorDescribingRequestNonfulfillment];
+    }
+    
+    return _responseString;
+}
+
 #pragma mark NSURLSessionDataDelegate
 
 - (void)URLSession:(NSURLSession *)session
@@ -1151,14 +1205,6 @@ didReceiveResponse:(NSURLResponse *)response
 }
 
 @end
-
-@implementation NSURLRequest (IgnoreSSLValidation)
-
-+ (BOOL)allowsAnyHTTPSCertificateForHost:(NSString *)host {
-    return YES;
-}
-@end
-/**/
 
 @implementation NSError (STHTTPRequest)
 
