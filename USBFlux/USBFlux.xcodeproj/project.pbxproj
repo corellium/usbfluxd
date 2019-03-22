@@ -18,7 +18,6 @@
 		04D7270F215C13E800B29E2E /* PasswordEntry.m in Sources */ = {isa = PBXBuildFile; fileRef = 04D7270E215C13E800B29E2E /* PasswordEntry.m */; };
 		04D72717215C53DB00B29E2E /* SimpleTextInput.m in Sources */ = {isa = PBXBuildFile; fileRef = 04D72716215C53DB00B29E2E /* SimpleTextInput.m */; };
 		DB0E4FBB223588E0003C07CF /* STHTTPRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = DB0E4FB9223588E0003C07CF /* STHTTPRequest.m */; };
-		DB272BA2223574D8007AB43E /* domain.conf in Resources */ = {isa = PBXBuildFile; fileRef = DB272BA1223574D7007AB43E /* domain.conf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,7 +40,6 @@
 		04D72716215C53DB00B29E2E /* SimpleTextInput.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SimpleTextInput.m; sourceTree = "<group>"; };
 		DB0E4FB9223588E0003C07CF /* STHTTPRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = STHTTPRequest.m; sourceTree = "<group>"; };
 		DB0E4FBA223588E0003C07CF /* STHTTPRequest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = STHTTPRequest.h; sourceTree = "<group>"; };
-		DB272BA1223574D7007AB43E /* domain.conf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = domain.conf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,7 +76,6 @@
 			children = (
 				DB0E4FBA223588E0003C07CF /* STHTTPRequest.h */,
 				DB0E4FB9223588E0003C07CF /* STHTTPRequest.m */,
-				DB272BA1223574D7007AB43E /* domain.conf */,
 				0430E95120C00CA30047F28C /* AuthIcon.png */,
 				0430E93520BEF9F00047F28C /* AppDelegate.h */,
 				0430E93620BEF9F00047F28C /* AppDelegate.m */,
@@ -162,7 +159,6 @@
 				0430E93920BEF9F10047F28C /* Assets.xcassets in Resources */,
 				0430E95220C00CA30047F28C /* AuthIcon.png in Resources */,
 				0430E93C20BEF9F10047F28C /* MainMenu.xib in Resources */,
-				DB272BA2223574D8007AB43E /* domain.conf in Resources */,
 				0430E95420C02E5B0047F28C /* usbfluxd in Resources */,
 				047357A420DB2A9F0089445A /* terminate.sh in Resources */,
 			);
@@ -315,7 +311,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Mac Developer";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = XG264R6QP8;
