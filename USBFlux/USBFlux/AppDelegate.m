@@ -10,6 +10,7 @@
 #import "Corellium.h"
 #import "PasswordEntry.h"
 #import "SimpleTextInput.h"
+#import "Preferences.h"
 #include <Security/Security.h>
 
 #include <sys/sysctl.h>
@@ -20,8 +21,6 @@
 #include <spawn.h>
 
 static AuthorizationRef authorization = nil;
-
-#define APPID CFSTR("com.corellium.USBFlux")
 
 @interface AppDelegate ()
 {
@@ -673,10 +672,12 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
                 CFRelease(update_data);
                 CFRelease(update_query);
                 if (status != errSecSuccess) {
-                    NSAlert *alert = [[NSAlert alloc] init];
-                    [alert setMessageText:[NSString stringWithFormat:@"Failed to update credentials in keychain (error %d)", status]];
-                    [alert setAlertStyle:NSAlertStyleCritical];
-                    [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        NSAlert *alert = [[NSAlert alloc] init];
+                        [alert setMessageText:[NSString stringWithFormat:@"Failed to update credentials in keychain (error %d)", status]];
+                        [alert setAlertStyle:NSAlertStyleCritical];
+                        [alert runModal];
+                    });
                     return;
                 }
             }
@@ -694,10 +695,12 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
                 CFPreferencesSetAppValue(CFSTR("Domain"), (__bridge CFStringRef)fullDomain, APPID);
                 CFPreferencesAppSynchronize(APPID);
             } else {
-                NSAlert *alert = [[NSAlert alloc] init];
-                [alert setMessageText:[NSString stringWithFormat:@"Failed to store credentials in keychain (error %d)", status]];
-                [alert setAlertStyle:NSAlertStyleCritical];
-                [alert performSelectorOnMainThread:@selector(runModal) withObject:nil waitUntilDone:YES];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    NSAlert *alert = [[NSAlert alloc] init];
+                    [alert setMessageText:[NSString stringWithFormat:@"Failed to store credentials in keychain (error %d)", status]];
+                    [alert setAlertStyle:NSAlertStyleCritical];
+                    [alert runModal];
+                });
                 return;
             }
         }

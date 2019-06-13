@@ -14,6 +14,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import <CommonCrypto/CommonDigest.h>
+#import "Preferences.h"
 #import "STHTTPRequest.h"
 
 NSUInteger const kSTHTTPRequestCancellationError = 1;
@@ -964,6 +965,15 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
         SecTrustResultType trustResult;
         BOOL trusted = NO;
         
+        NSDictionary *trustedCertificates = CFBridgingRelease(CFPreferencesCopyAppValue(CFSTR("TrustedCertificates"), APPID));
+        if (trustedCertificates) {
+            NSData *exceptions = trustedCertificates[protectionSpace.host];
+            if (exceptions) {
+                NSLog(@"Using stored exceptions %@", exceptions);
+                SecTrustSetExceptions(trust, (__bridge CFDataRef)exceptions);
+            }
+        }        
+
         err = SecTrustEvaluate(trust, &trustResult);
         
         if (trustResult == kSecTrustResultProceed || trustResult == kSecTrustResultUnspecified) {
@@ -972,6 +982,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
         
         if (!trusted) {
             NSLog(@"Certificate not trusted (yet)");
+            
             if (SecTrustGetCertificateCount(trust) > 0) {
                 SecCertificateRef cert = SecTrustGetCertificateAtIndex(trust, 0);
                 NSData *certificateData = (NSData *)CFBridgingRelease(SecCertificateCopyData(cert));
@@ -1010,7 +1021,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
                 if (userReturnCode == NSAlertSecondButtonReturn) {
                     err = SecCertificateAddToKeychain(cert, NULL);
                     NSLog(@"SecCertificateAddToKeychain = %d", err);
-                    
+
                     NSDictionary* settings = nil;
                     err = SecTrustSettingsSetTrustSettings(cert, kSecTrustSettingsDomainUser, (__bridge CFTypeRef)(settings));
                     NSLog(@"SecTrustSettingsSetTrustSettings = %d", err);
@@ -1023,6 +1034,18 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
                     err = SecTrustSetAnchorCertificates(trust, certs);
                     CFRelease(certs);
                     NSLog(@"SecTrustSetAnchorCertificates = %d", err);
+                    
+                    NSMutableDictionary *newTrustedCertificates = nil;
+                    if (trustedCertificates) {
+                        newTrustedCertificates = [NSMutableDictionary dictionaryWithDictionary:trustedCertificates];
+                    } else {
+                        newTrustedCertificates = [[NSMutableDictionary alloc] init];
+                    }
+                    
+                    newTrustedCertificates[protectionSpace.host] = (NSData *)CFBridgingRelease(SecTrustCopyExceptions(trust));
+                    SecTrustSetExceptions(trust, (__bridge CFDataRef)newTrustedCertificates[protectionSpace.host]);
+                    
+                    CFPreferencesSetAppValue(CFSTR("TrustedCertificates"), (__bridge CFPropertyListRef)newTrustedCertificates, APPID);
                     
                     trusted = YES;
                 }
