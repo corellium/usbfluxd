@@ -613,14 +613,29 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
     NSString *domain = [options objectForKey:@"domain"];
     NSString *protocol = [options objectForKey:@"protocol"];
     NSString *fullDomain = [NSString stringWithFormat:@"%@://%@", protocol, domain];
+    NSString *totp = [options objectForKey:@"totp"];
     [self setApiStatus:[NSString stringWithFormat:@"Connecting to %@ ...", domain]];
-    Corellium *corelliumTest = [[Corellium alloc] initWithDomain:fullDomain username:[options objectForKey:@"username"] password:[options objectForKey:@"password"]];
+    Corellium *corelliumTest = [[Corellium alloc] initWithDomain:fullDomain username:[options objectForKey:@"username"] password:[options objectForKey:@"password"] totp:totp];
     NSError *err = nil;
     if (![corelliumTest login:&err]) {
         [self setApiStatus:@""];
         if (err.code == NSURLErrorTimedOut && ![[options objectForKey:@"onError"] isEqualToString:@"runConfigureDomain"]) {
             [self setApiStatus:[NSString stringWithFormat:@"Timeout while connecting to %@", domain]];
             [self performSelectorOnMainThread:@selector(timeoutRetryLogin:) withObject:options waitUntilDone:NO];
+        } else if ([err.domain isEqualToString:@"CorelliumDomain"] && err.code == 401) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                SimpleTextInput *totpEntry = [[SimpleTextInput alloc] init];
+                [totpEntry setMessageText:@"Enter One-Time Code"];
+                [totpEntry setInformativeText:@"Multi-factor authentication is enabled. Please enter your current one-time code."];
+                [totpEntry setPlaceholder:@"000000"];
+                if ([totpEntry runModal] == NSAlertFirstButtonReturn) {
+                    NSMutableDictionary *newOptions = [[NSMutableDictionary alloc] initWithDictionary:options];
+                    [newOptions setObject:[totpEntry textValue] forKey:@"totp"];
+                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                        [self tryLogin:newOptions];
+                    });
+                }
+            });
         } else {
             dispatch_async(dispatch_get_main_queue(), ^{
                 NSAlert *alert = [[NSAlert alloc] init];

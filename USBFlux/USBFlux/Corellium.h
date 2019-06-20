@@ -10,7 +10,7 @@
 
 @interface Corellium : NSObject <NSURLConnectionDelegate>
 @property (nonatomic, copy) NSString* domain;
--(id)initWithDomain:(NSString*)domain username:(NSString*)username password:(NSString*)password;
+- (id)initWithDomain:(NSString *)domain username:(NSString *)u password:(NSString *)p totp:(NSString *)totp;
 -(BOOL)login:(NSError**)error;
 -(id)projects:(NSError**)error;
 -(id)instances:(NSError**)error;

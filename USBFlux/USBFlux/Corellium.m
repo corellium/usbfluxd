@@ -13,6 +13,7 @@
 {
     NSString *username;
     NSString *password;
+    NSString *_totp;
     NSString* endpoint;
     id token;
 }
@@ -20,7 +21,7 @@
 
 @implementation Corellium
 
-- (id)initWithDomain:(NSString*)domain username:(NSString*)u password:(NSString*)p
+- (id)initWithDomain:(NSString *)domain username:(NSString *)u password:(NSString *)p totp:(NSString *)totp
 {
     self = [super init];
     if (self) {
@@ -28,6 +29,7 @@
         self.domain = domain;
         username = u;
         password = p;
+        _totp = totp;
     }
     return self;
 }
@@ -52,6 +54,8 @@
     NSMutableDictionary *requestDict = [NSMutableDictionary dictionary];
     [requestDict setObject:username forKey:@"username"];
     [requestDict setObject:password forKey:@"password"];
+    if (_totp)
+        [requestDict setObject:_totp forKey:@"totpToken"];
     
     STHTTPRequest *request = [STHTTPRequest requestWithURLString:[NSString stringWithFormat:@"%@/tokens", endpoint]];
     [request setHTTPMethod:@"POST"];
@@ -72,14 +76,23 @@
     }
     
     NSDictionary *json = [NSJSONSerialization JSONObjectWithData:[response dataUsingEncoding:NSUTF8StringEncoding] options:0 error:&err];
-    if (json && [json objectForKey:@"token"]) {
-        token = json;
-    } else {
-        if (error) {
-            *error = err;
+    if (json) {
+        if ([json objectForKey:@"token"]) {
+            token = json;
+            return token;
         }
-        token = nil;
+        
+        NSString *errorID = [json objectForKey:@"errorID"];
+        if (errorID && [errorID isEqualToString:@"InvalidTOTP"]) {
+            err = [[NSError alloc] initWithDomain:@"CorelliumDomain" code:401 userInfo:nil];
+        }
     }
+    
+    if (error) {
+        *error = err;
+    }
+    token = nil;
+
     return token;
 }
 
