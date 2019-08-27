@@ -494,7 +494,7 @@ NSDictionary* usbfluxdQuery(const char* req_xml, uint32_t req_len)
         if (localInst) {
             local_devices = [[localInst objectForKey:@"DeviceCount"] intValue];
         }
-        self.detailLabel.stringValue = [NSString stringWithFormat:@"%d Instance%s (%d Local / %d Remote)\n%d Device%s (%d Local / %d Remote)", local_count+remote_count,  (local_count+remote_count == 1) ? "" : "s", local_count, remote_count, local_devices+remote_devices, (local_devices+remote_devices == 1) ? "" : "s", local_devices, remote_devices];
+        self.detailLabel.stringValue = [NSString stringWithFormat:@"%d Device%s (%d Local / %d Remote)", local_devices+remote_devices, (local_devices+remote_devices == 1) ? "" : "s", local_devices, remote_devices];
         self.detailLabel.hidden = NO;
     } else {
         usbfluxd_running = 0;
