@@ -817,11 +817,15 @@ void usbmux_remote_init(int no_mdns)
 		pthread_mutex_unlock(&remote_list_mutex);
 	}
 
+#if (defined HAVE_CFNETWORK) || (defined HAVE_AVAHI_CLIENT)
 	if (opt_no_mdns) {
 		usbfluxd_log(LL_WARNING, "mDNS support disabled - instances have to be managed manually");
 	} else {
 		pthread_create(&th_mdns_mon, NULL, mdns_monitor_thread, NULL);
 	}
+#else
+	usbfluxd_log(LL_WARNING, "mDNS support not built in - instances have to be managed manually");
+#endif
 }
 
 void usbmux_remote_shutdown(void)
