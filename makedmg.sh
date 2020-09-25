@@ -11,7 +11,7 @@ BUILDDIR="USBFlux/build/Release"
 # build the daemon
 make clean && make
 # sign it
-codesign -s "Developer ID Application: Corellium LLC (XG264R6QP8)" src/usbfluxd
+codesign -s "Developer ID Application: Corellium LLC (XG264R6QP8)" usbfluxd/usbfluxd
 
 COMMIT=`git rev-parse HEAD`
 if test -z $COMMIT; then

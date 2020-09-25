@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = src tools
+SUBDIRS = usbfluxd tools
 
 EXTRA_DIST = COPYING.GPLv2 COPYING.GPLv3
 

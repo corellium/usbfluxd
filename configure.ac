@@ -5,7 +5,7 @@ AC_PREREQ(2.64)
 AC_INIT([usbfluxd], [1.2.0], [https://corellium.com],, [https://corellium.com])
 AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip check-news])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES])
-AC_CONFIG_SRCDIR([src/])
+AC_CONFIG_SRCDIR([usbfluxd/])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -91,7 +91,7 @@ m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_OUTPUT([
 Makefile
-src/Makefile
+usbfluxd/Makefile
 tools/Makefile
 ])
 

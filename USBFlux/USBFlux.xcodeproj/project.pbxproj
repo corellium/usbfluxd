@@ -30,7 +30,7 @@
 		0430E93E20BEF9F10047F28C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		0430E94020BEF9F10047F28C /* USBFlux.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = USBFlux.entitlements; sourceTree = "<group>"; };
 		0430E95120C00CA30047F28C /* AuthIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AuthIcon.png; sourceTree = "<group>"; };
-		0430E95320C02E5B0047F28C /* usbfluxd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = usbfluxd; path = ../src/usbfluxd; sourceTree = "<group>"; };
+		0430E95320C02E5B0047F28C /* usbfluxd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = usbfluxd; path = ../usbfluxd/usbfluxd; sourceTree = "<group>"; };
 		047357A320DB2A9F0089445A /* terminate.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; name = terminate.sh; path = USBFlux/terminate.sh; sourceTree = "<group>"; };
 		04D7270A215BD74000B29E2E /* Corellium.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Corellium.h; sourceTree = "<group>"; };
 		04D7270B215BD74000B29E2E /* Corellium.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Corellium.m; sourceTree = "<group>"; };
