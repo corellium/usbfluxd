@@ -16,7 +16,7 @@ AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
-PKG_CHECK_MODULES(libplist, libplist >= 1.11)
+PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.2.0)
 AC_CHECK_LIB(pthread, [pthread_create, pthread_mutex_lock], [AC_SUBST(libpthread_LIBS,[-lpthread])], [AC_MSG_ERROR([libpthread is required to build usbfluxd])])
 
 # Checks for header files.
@@ -73,14 +73,13 @@ AC_ARG_WITH([static-libplist],
             [with_static_libplist=yes])
 if test "x$with_static_libplist" != "xno"; then
   if test "x$with_static_libplist" = "xyes"; then
-    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist |sed 's/^..//; s/[ ]*$/\/libplist.a/'`"
+    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist-2.0 |sed 's/^..//; s/[ ]*$/\/libplist-2.0.a/'`"
   else
     STATIC_LIBPLIST="$with_static_libplist"
   fi
   if ! test -f "$STATIC_LIBPLIST"; then
     AC_MSG_ERROR([The file ${STATIC_LIBPLIST} passed to --with-static-libplist does not exist])
   fi
-  echo "*** Note: Will link with static libplist found at ${STATIC_LIBPLIST} ***"
   AC_SUBST(libplist_LIBS, [$STATIC_LIBPLIST])
 fi
 
