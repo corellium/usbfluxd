@@ -48,7 +48,8 @@ Build Requirements
 ==================
 
 Development Packages of:
-	libplist
+	[libplist-2.0](https://github.com/libimobiledevice/libplist)
+	libavahi-client-dev
 
 Software:
 	make
