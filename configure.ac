@@ -19,6 +19,8 @@ AC_PROG_LIBTOOL
 PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.2.0)
 AC_CHECK_LIB(pthread, [pthread_create, pthread_mutex_lock], [AC_SUBST(libpthread_LIBS,[-lpthread])], [AC_MSG_ERROR([libpthread is required to build usbfluxd])])
 
+AC_SEARCH_LIBS([fmin], [m])
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdint.h stdlib.h string.h])
