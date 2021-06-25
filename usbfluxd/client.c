@@ -977,8 +977,9 @@ static void process_recv(struct mux_client *client)
 		if(client->ib_size < hdr->length)
 			return;
 	}
-	client_command(client, hdr);
-	client->ib_size = 0;
+	if (client_command(client, hdr) == 0) {
+		client->ib_size = 0;
+	}
 }
 
 void client_process(int fd, short events)
