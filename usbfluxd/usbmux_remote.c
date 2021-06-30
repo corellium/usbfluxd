@@ -54,6 +54,7 @@
 
 static struct collection remote_list;
 pthread_mutex_t remote_list_mutex;
+extern pthread_mutex_t gethostbyname_mutex;
 static plist_t remote_device_list = NULL;
 static uint8_t remote_id_map[32];
 static int opt_no_mdns = 0;
@@ -800,6 +801,7 @@ void usbmux_remote_init(int no_mdns)
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
 
 	collection_init(&remote_list);
+	pthread_mutex_init(&gethostbyname_mutex, NULL);
 	pthread_mutex_init(&remote_list_mutex, NULL);
 	remote_device_list = plist_new_dict();
 	memset(&remote_id_map, '\0', sizeof(remote_id_map));
@@ -851,6 +853,7 @@ void usbmux_remote_shutdown(void)
 	} ENDFOREACH
 	pthread_mutex_unlock(&remote_list_mutex);
 	pthread_mutex_destroy(&remote_list_mutex);
+	pthread_mutex_destroy(&gethostbyname_mutex);
 	collection_free(&remote_list);
 	plist_free(remote_device_list);
 	remote_device_list = NULL;
