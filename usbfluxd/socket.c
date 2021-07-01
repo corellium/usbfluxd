@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "socket.h"
 #include "log.h"
@@ -94,28 +95,40 @@ int socket_connect_unix(const char *filename)
 	return sfd;
 }
 
+// Needs scoped access to hostent to avoid data races
+pthread_mutex_t gethostbyname_mutex;
+
 int socket_connect_timeout(const char *addr, uint16_t port, struct timeval *timeout)
 {
 	int sfd = -1;
 	int yes = 1;
 	int bufsize = 0x20000;
-	struct hostent *hp;
 	struct sockaddr_in saddr;
+	uint32_t s_addr;
 
 	if (!addr) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	if ((hp = gethostbyname(addr)) == NULL) {
-		usbfluxd_log(LL_ERROR, "%s: unknown host '%s'", __func__, addr);
-		return -1;
-	}
+	// gethostbyname(3) returns pointer to global instance. See man page for
+	// more details
+	pthread_mutex_lock(&gethostbyname_mutex);
+	{
+		struct hostent *hp;
+		if ((hp = gethostbyname(addr)) == NULL) {
+			usbfluxd_log(LL_ERROR, "%s: unknown host '%s'", __func__, addr);
+			return -1;
+		}
 
-	if (!hp->h_addr) {
-		usbfluxd_log(LL_ERROR, "%s: gethostbyname returned NULL address!", __func__);
-		return -1;
+		if (!hp->h_addr) {
+			usbfluxd_log(LL_ERROR, "%s: gethostbyname returned NULL address!", __func__);
+			return -1;
+		}
+
+		s_addr = *(uint32_t *) hp->h_addr;
 	}
+	pthread_mutex_unlock(&gethostbyname_mutex);
 
 	if (0 > (sfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP))) {
 		usbfluxd_log(LL_ERROR, "%s: socket: %s", __func__, strerror(errno));
@@ -150,7 +163,7 @@ int socket_connect_timeout(const char *addr, uint16_t port, struct timeval *time
 
 	memset((void *) &saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
-	saddr.sin_addr.s_addr = *(uint32_t *) hp->h_addr;
+	saddr.sin_addr.s_addr = s_addr;
 	saddr.sin_port = htons(port);
 
 	fcntl(sfd, F_SETFL, O_NONBLOCK);
