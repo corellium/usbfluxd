@@ -67,7 +67,7 @@ Installation From Source
 
 To compile run:
 ```zsh
-# brew install make autoheader automake autoconf libtool pkg-config gcc libimobiledevice
+# brew install make automake autoconf libtool pkg-config gcc libimobiledevice usbmuxd
 
 git clone https://github.com/corellium/usbfluxd.git
 cd usbfluxd
