@@ -77,8 +77,9 @@ make
 sudo make install
 ```
 
-Also available from the Arch User Repository for Linux hosts: [https://aur.archlinux.org/packages/usbfluxd/](https://aur.archlinux.org/packages/usbfluxd/)
-
+Also available from the Arch User Repository for Linux hosts:
+- [https://aur.archlinux.org/packages/usbfluxd/](https://aur.archlinux.org/packages/usbfluxd/)
+- [https://aur.archlinux.org/packages/usbfluxd-git/](https://aur.archlinux.org/packages/usbfluxd-git/)
 
 Linux Usage
 ===========
