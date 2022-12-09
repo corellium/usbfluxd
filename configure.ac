@@ -72,17 +72,13 @@ AC_ARG_WITH([static-libplist],
             [AS_HELP_STRING(["--with-static-libplist[=/path/to/static/libplist"]],
             [link against a static libplist])],
             [with_static_libplist=$withval],
-            [with_static_libplist=yes])
-if test "x$with_static_libplist" != "xno"; then
-  if test "x$with_static_libplist" = "xyes"; then
-    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist-2.0 |sed 's/^..//; s/[ ]*$/\/libplist-2.0.a/'`"
-  else
-    STATIC_LIBPLIST="$with_static_libplist"
-  fi
-  if ! test -f "$STATIC_LIBPLIST"; then
-    AC_MSG_ERROR([The file ${STATIC_LIBPLIST} passed to --with-static-libplist does not exist])
-  fi
-  AC_SUBST(libplist_LIBS, [$STATIC_LIBPLIST])
+            [with_static_libplist=no])
+if test "x$with_static_libplist" = xno; then
+  PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.2.0)
+else
+  # Use the static libplist from the specified path
+  AC_SUBST(libplist_CFLAGS, "-I${with_static_libplist}/include")
+  AC_SUBST(libplist_LIBS, "${with_static_libplist}/lib/libplist.a")
 fi
 
 AS_COMPILER_FLAGS(GLOBAL_CFLAGS, "-g -Wall -Wextra -Wmissing-declarations -Wredundant-decls -Wshadow -Wpointer-arith  -Wwrite-strings -Wswitch-default -Wno-unused-parameter")
