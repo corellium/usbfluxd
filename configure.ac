@@ -16,7 +16,16 @@ AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
-PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.2.0)
+PKG_CHECK_MODULES(libplist, libplist >= 2.2.0,
+  [
+    AC_DEFINE([HAVE_LIBPLIST], [1], [Use libplist])
+    LIBPLIST=libplist
+  ], [
+    PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.2.0, [
+    LIBPLIST=libplist-2.0
+    AC_DEFINE([HAVE_LIBPLIST_2_0], [1], [Use libplist-2.0])
+  ])],
+)
 AC_CHECK_LIB(pthread, [pthread_create, pthread_mutex_lock], [AC_SUBST(libpthread_LIBS,[-lpthread])], [AC_MSG_ERROR([libpthread is required to build usbfluxd])])
 
 AC_SEARCH_LIBS([fmin], [m])
@@ -75,7 +84,7 @@ AC_ARG_WITH([static-libplist],
             [with_static_libplist=yes])
 if test "x$with_static_libplist" != "xno"; then
   if test "x$with_static_libplist" = "xyes"; then
-    STATIC_LIBPLIST="`pkg-config --libs-only-L libplist-2.0 |sed 's/^..//; s/[ ]*$/\/libplist-2.0.a/'`"
+    STATIC_LIBPLIST="`pkg-config --libs-only-L ${LIBPLIST} |sed 's/^..//; s/[ ]*$/\/${LIBPLIST}.a/'`"
   else
     STATIC_LIBPLIST="$with_static_libplist"
   fi
