@@ -149,7 +149,7 @@ static plist_t usbfluxd_query(const char *req_xml)
 				}
 				rr += r;
 			}
-			if (rr == total) {	
+			if (rr == total) {
 				plist_t pl = NULL;
 				plist_from_xml(p, total, &pl);
 				if (!pl) {
@@ -171,7 +171,7 @@ static plist_t usbfluxd_query(const char *req_xml)
 	}
 	close(sfd);
 
-	return plist_out;	
+	return plist_out;
 }
 
 static int handle_list(const char *arg)
@@ -346,7 +346,7 @@ static void print_usage(const char *argv0)
 	cmd = (cmd) ? cmd+1 : argv0;
 	printf("usage: %s add HOSTADDR[:PORT]\n", cmd);
 	printf("       %s del HOSTADDR[:PORT]\n", cmd);
-	printf("       %s list [xml]\n", cmd);	
+	printf("       %s list [xml]\n", cmd);
 }
 
 int main(int argc, char **argv)
@@ -379,5 +379,5 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	return result;	
+	return result;
 }

@@ -92,7 +92,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
 }
 
 - (instancetype)initWithURL:(NSURL *)theURL {
-    
+
     if (self = [super init]) {
         self.url = theURL;
         self.responseData = [[NSMutableData alloc] init];
@@ -108,7 +108,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
         self.cookieStoragePolicyForInstance = STHTTPRequestCookiesStorageUndefined; // globalCookiesStoragePolicy will be used
         self.ephemeralRequestCookies = [NSMutableArray array];
     }
-    
+
     return self;
 }
 
@@ -150,7 +150,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
     NSURLCredential *c = [NSURLCredential credentialWithUser:username
                                                     password:password
                                                  persistence:NSURLCredentialPersistenceNone];
-    
+
     [self setCredentialForCurrentHost:c];
 }
 
@@ -168,7 +168,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
     if(_cookieStoragePolicyForInstance != STHTTPRequestCookiesStorageUndefined) {
         return _cookieStoragePolicyForInstance;
     }
-    
+
     return globalCookiesStoragePolicy;
 }
 
@@ -181,35 +181,35 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
 
 + (NSArray *)sessionCookiesInSharedCookiesStorage {
     NSArray *allCookies = [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookies];
-    
+
     NSArray *sessionCookies = [allCookies filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings) {
         NSHTTPCookie *cookie = (NSHTTPCookie *)evaluatedObject;
         return [cookie isSessionOnly];
     }]];
-    
+
     return sessionCookies;
 }
 
 - (NSArray *)sessionCookies {
-    
+
     NSArray *allCookies = nil;
-    
+
     if([self cookieStoragePolicy] == STHTTPRequestCookiesStorageShared) {
         allCookies = [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookies];
     } else if ([self cookieStoragePolicy] == STHTTPRequestCookiesStorageLocal) {
         allCookies = [[self class] localCookiesStorage];
     }
-    
+
     NSArray *sessionCookies = [allCookies filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings) {
         NSHTTPCookie *cookie = (NSHTTPCookie *)evaluatedObject;
         return [cookie isSessionOnly];
     }]];
-    
+
     return sessionCookies;
 }
 
 - (void)deleteSessionCookies {
-    
+
     for(NSHTTPCookie *cookie in [self sessionCookies]) {
         if([self cookieStoragePolicy] == STHTTPRequestCookiesStorageShared) {
             [[NSHTTPCookieStorage sharedHTTPCookieStorage] deleteCookie:cookie];
@@ -972,7 +972,7 @@ static STHTTPRequestCookiesStorage globalCookiesStoragePolicy = STHTTPRequestCoo
                 NSLog(@"Using stored exceptions %@", exceptions);
                 SecTrustSetExceptions(trust, (__bridge CFDataRef)exceptions);
             }
-        }        
+        }
 
         err = SecTrustEvaluate(trust, &trustResult);
         

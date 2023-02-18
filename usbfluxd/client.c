@@ -663,212 +663,211 @@ static int client_command(struct mux_client *client, struct usbmuxd_header *hdr)
 			if (!dict) {
 				usbfluxd_log(LL_ERROR, "Could not parse plist from payload!");
 				return -1;
-			} else {
-				char *message = NULL;
-				plist_t node = plist_dict_get_item(dict, "MessageType");
-				if (!node || plist_get_node_type(node) != PLIST_STRING) {
-					usbfluxd_log(LL_ERROR, "Could not read valid MessageType node from plist!");
-					plist_free(dict);
+			}
+			char *message = NULL;
+			plist_t node = plist_dict_get_item(dict, "MessageType");
+			if (!node || plist_get_node_type(node) != PLIST_STRING) {
+				usbfluxd_log(LL_ERROR, "Could not read valid MessageType node from plist!");
+				plist_free(dict);
+				return -1;
+			}
+			plist_get_string_val(node, &message);
+			if (!message) {
+				usbfluxd_log(LL_ERROR, "Could not extract MessageType from plist!");
+				plist_free(dict);
+				return -1;
+			}
+			update_client_info(client, dict);
+			usbfluxd_log(LL_DEBUG, "%s: Message is %s client fd %d", __func__, message, client->fd);
+			if (!strcmp(message, "Listen")) {
+				free(message);
+				plist_free(dict);
+				if (send_result(client, hdr->tag, 0) < 0)
 					return -1;
+				return start_listen(client);
+			} else if (!strcmp(message, "Connect")) {
+				uint64_t val;
+				uint16_t portnum = 0;
+				uint32_t device_id = 0;
+				free(message);
+				// get device id
+				node = plist_dict_get_item(dict, "DeviceID");
+				if (!node) {
+					usbfluxd_log(LL_ERROR, "Received connect request without device_id!");
+					plist_free(dict);
+					if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
+						return -1;
+					return 0;
 				}
-				plist_get_string_val(node, &message);
-				if (!message) {
-					usbfluxd_log(LL_ERROR, "Could not extract MessageType from plist!");
-					plist_free(dict);
-					return -1;
-				}
-				update_client_info(client, dict);
-				usbfluxd_log(LL_DEBUG, "%s: Message is %s client fd %d", __func__, message, client->fd);
-				if (!strcmp(message, "Listen")) {
-					free(message);
-					plist_free(dict);
-					if (send_result(client, hdr->tag, 0) < 0)
-						return -1;
-					return start_listen(client);
-				} else if (!strcmp(message, "Connect")) {
-					uint64_t val;
-					uint16_t portnum = 0;
-					uint32_t device_id = 0;
-					free(message);
-					// get device id
-					node = plist_dict_get_item(dict, "DeviceID");
-					if (!node) {
-						usbfluxd_log(LL_ERROR, "Received connect request without device_id!");
-						plist_free(dict);
-						if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
-							return -1;
-						return 0;
-					}
-					val = 0;
-					plist_get_uint_val(node, &val);
-					device_id = (uint32_t)val;
+				val = 0;
+				plist_get_uint_val(node, &val);
+				device_id = (uint32_t)val;
 
-					// get port number
-					node = plist_dict_get_item(dict, "PortNumber");
-					if (!node) {
-						usbfluxd_log(LL_ERROR, "Received connect request without port number!");
-						plist_free(dict);
-						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
-							return -1;
-						return 0;
-					}
-					val = 0;
-					plist_get_uint_val(node, &val);
-					portnum = (uint16_t)val;
-
-					usbfluxd_log(LL_DEBUG, "Client %d connection request to device %d port %d", client->fd, device_id, ntohs(portnum));
-
-					res = usbmux_remote_connect(device_id, hdr->tag, dict, client);
-					plist_free(dict);
-					if(res < 0) {
-						if (send_result(client, hdr->tag, -res) < 0)
-							return -1;
-					} else {
-						client->connect_tag = hdr->tag;
-						client->connect_device = device_id;
-						client->state = CLIENT_CONNECTING1;
-					}
-					return 0;
-				} else if (!strcmp(message, "ListDevices")) {
-					free(message);
-					plist_free(dict);
-					if (send_device_list(client, hdr->tag) < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "ListListeners")) {
-					free(message);
-					plist_free(dict);
-					if (send_listener_list(client, hdr->tag) < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "ReadBUID")) {
-					free(message);
-					res = usbmux_remote_read_buid(hdr->tag, client);
-					plist_free(dict);
-					return 0;
-				} else if (!strcmp(message, "ReadPairRecord")) {
-					free(message);
-					char* record_id = plist_dict_copy_string_val(dict, "PairRecordID");
-					plist_free(dict);
-					res = usbmux_remote_read_pair_record(record_id, hdr->tag, client);
-					free(record_id);
-					if (res < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "SavePairRecord")) {
-					free(message);
-					char* record_id = plist_dict_copy_string_val(dict, "PairRecordID");
-					res = usbmux_remote_save_pair_record(record_id, dict, hdr->tag, client);
-					plist_free(dict);
-					if (res < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "DeletePairRecord")) {
-					free(message);
-					char* record_id = plist_dict_copy_string_val(dict, "PairRecordID");
-					plist_free(dict);
-					res = usbmux_remote_delete_pair_record(record_id, hdr->tag, client);
-					free(record_id);
-					if (res < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "Instances")) {
-					free(message);
-					plist_free(dict);
-					if (send_instances(client, hdr->tag) < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "AddInstance")) {
-					free(message);
-					char* hostaddr = plist_dict_copy_string_val(dict, "HostAddress");
-					if (!hostaddr) {
-						usbfluxd_log(LL_ERROR, "Received AddInstance request without host address!");
-						plist_free(dict);
-						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
-							return -1;
-						return 0;
-					}
-					uint64_t val;
-					uint16_t portnum = 0;
-					node = plist_dict_get_item(dict, "PortNumber");
-					if (!node) {
-						usbfluxd_log(LL_ERROR, "Received AddInstance request without port number!");
-						plist_free(dict);
-						free(hostaddr);
-						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
-							return -1;
-						return 0;
-					}
-					val = 0;
-					plist_get_uint_val(node, &val);
-					portnum = (uint16_t)val;
-
-					int rv = usbmux_remote_add_remote(hostaddr, portnum);
-					if (rv < 0) {
-						int rc = RESULT_CONNREFUSED;
-						if (rv == -2) {
-							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u (already present)", hostaddr, portnum);
-							rc = RESULT_BADDEV;
-						} else {
-							usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u", hostaddr, portnum);
-						}
-						free(hostaddr);
-						plist_free(dict);
-						if (send_result(client, hdr->tag, rc) < 0)
-							return -1;
-						return 0;
-					}
-					free(hostaddr);
-					plist_free(dict);
-					if (send_result(client, hdr->tag, RESULT_OK) < 0)
-						return -1;
-					return 0;
-				} else if (!strcmp(message, "RemoveInstance")) {
-					free(message);
-					char* hostaddr = plist_dict_copy_string_val(dict, "HostAddress");
-					if (!hostaddr) {
-						usbfluxd_log(LL_ERROR, "Received RemoveInstance request without host address!");
-						plist_free(dict);
-						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
-							return -1;
-						return 0;
-					}
-					uint64_t val;
-					uint16_t portnum = 0;
-					node = plist_dict_get_item(dict, "PortNumber");
-					if (!node) {
-						usbfluxd_log(LL_ERROR, "Received RemoveInstance request without port number!");
-						plist_free(dict);
-						free(hostaddr);
-						if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
-							return -1;
-						return 0;
-					}
-					val = 0;
-					plist_get_uint_val(node, &val);
-					portnum = (uint16_t)val;
-
-					if (usbmux_remote_remove_remote(hostaddr, portnum) < 0) {
-						usbfluxd_log(LL_ERROR, "Failed to remove remote %s:%u", hostaddr, portnum);
-						free(hostaddr);
-						plist_free(dict);
-						if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
-							return -1;
-						return 0;
-					}
-					free(hostaddr);
-					plist_free(dict);
-					if (send_result(client, hdr->tag, RESULT_OK) < 0)
-						return -1;
-					return 0;
-				} else {
-					usbfluxd_log(LL_ERROR, "Unexpected command '%s' received!", message);
-					free(message);
+				// get port number
+				node = plist_dict_get_item(dict, "PortNumber");
+				if (!node) {
+					usbfluxd_log(LL_ERROR, "Received connect request without port number!");
 					plist_free(dict);
 					if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
 						return -1;
 					return 0;
 				}
+				val = 0;
+				plist_get_uint_val(node, &val);
+				portnum = (uint16_t)val;
+
+				usbfluxd_log(LL_DEBUG, "Client %d connection request to device %d port %d", client->fd, device_id, ntohs(portnum));
+
+				res = usbmux_remote_connect(device_id, hdr->tag, dict, client);
+				plist_free(dict);
+				if(res < 0) {
+					if (send_result(client, hdr->tag, -res) < 0)
+						return -1;
+				} else {
+					client->connect_tag = hdr->tag;
+					client->connect_device = device_id;
+					client->state = CLIENT_CONNECTING1;
+				}
+				return 0;
+			} else if (!strcmp(message, "ListDevices")) {
+				free(message);
+				plist_free(dict);
+				if (send_device_list(client, hdr->tag) < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "ListListeners")) {
+				free(message);
+				plist_free(dict);
+				if (send_listener_list(client, hdr->tag) < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "ReadBUID")) {
+				free(message);
+				res = usbmux_remote_read_buid(hdr->tag, client);
+				plist_free(dict);
+				return 0;
+			} else if (!strcmp(message, "ReadPairRecord")) {
+				free(message);
+				char* record_id = plist_dict_copy_string_val(dict, "PairRecordID");
+				plist_free(dict);
+				res = usbmux_remote_read_pair_record(record_id, hdr->tag, client);
+				free(record_id);
+				if (res < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "SavePairRecord")) {
+				free(message);
+				char* record_id = plist_dict_copy_string_val(dict, "PairRecordID");
+				res = usbmux_remote_save_pair_record(record_id, dict, hdr->tag, client);
+				plist_free(dict);
+				if (res < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "DeletePairRecord")) {
+				free(message);
+				char* record_id = plist_dict_copy_string_val(dict, "PairRecordID");
+				plist_free(dict);
+				res = usbmux_remote_delete_pair_record(record_id, hdr->tag, client);
+				free(record_id);
+				if (res < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "Instances")) {
+				free(message);
+				plist_free(dict);
+				if (send_instances(client, hdr->tag) < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "AddInstance")) {
+				free(message);
+				char* hostaddr = plist_dict_copy_string_val(dict, "HostAddress");
+				if (!hostaddr) {
+					usbfluxd_log(LL_ERROR, "Received AddInstance request without host address!");
+					plist_free(dict);
+					if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+						return -1;
+					return 0;
+				}
+				uint64_t val;
+				uint16_t portnum = 0;
+				node = plist_dict_get_item(dict, "PortNumber");
+				if (!node) {
+					usbfluxd_log(LL_ERROR, "Received AddInstance request without port number!");
+					plist_free(dict);
+					free(hostaddr);
+					if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+						return -1;
+					return 0;
+				}
+				val = 0;
+				plist_get_uint_val(node, &val);
+				portnum = (uint16_t)val;
+
+				int rv = usbmux_remote_add_remote(hostaddr, portnum);
+				if (rv < 0) {
+					int rc = RESULT_CONNREFUSED;
+					if (rv == -2) {
+						usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u (already present)", hostaddr, portnum);
+						rc = RESULT_BADDEV;
+					} else {
+						usbfluxd_log(LL_ERROR, "Failed to add remote %s:%u", hostaddr, portnum);
+					}
+					free(hostaddr);
+					plist_free(dict);
+					if (send_result(client, hdr->tag, rc) < 0)
+						return -1;
+					return 0;
+				}
+				free(hostaddr);
+				plist_free(dict);
+				if (send_result(client, hdr->tag, RESULT_OK) < 0)
+					return -1;
+				return 0;
+			} else if (!strcmp(message, "RemoveInstance")) {
+				free(message);
+				char* hostaddr = plist_dict_copy_string_val(dict, "HostAddress");
+				if (!hostaddr) {
+					usbfluxd_log(LL_ERROR, "Received RemoveInstance request without host address!");
+					plist_free(dict);
+					if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+						return -1;
+					return 0;
+				}
+				uint64_t val;
+				uint16_t portnum = 0;
+				node = plist_dict_get_item(dict, "PortNumber");
+				if (!node) {
+					usbfluxd_log(LL_ERROR, "Received RemoveInstance request without port number!");
+					plist_free(dict);
+					free(hostaddr);
+					if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+						return -1;
+					return 0;
+				}
+				val = 0;
+				plist_get_uint_val(node, &val);
+				portnum = (uint16_t)val;
+
+				if (usbmux_remote_remove_remote(hostaddr, portnum) < 0) {
+					usbfluxd_log(LL_ERROR, "Failed to remove remote %s:%u", hostaddr, portnum);
+					free(hostaddr);
+					plist_free(dict);
+					if (send_result(client, hdr->tag, RESULT_BADDEV) < 0)
+						return -1;
+					return 0;
+				}
+				free(hostaddr);
+				plist_free(dict);
+				if (send_result(client, hdr->tag, RESULT_OK) < 0)
+					return -1;
+				return 0;
+			} else {
+				usbfluxd_log(LL_ERROR, "Unexpected command '%s' received!", message);
+				free(message);
+				plist_free(dict);
+				if (send_result(client, hdr->tag, RESULT_BADCOMMAND) < 0)
+					return -1;
+				return 0;
 			}
 			// should not be reached?!
 			return -1;

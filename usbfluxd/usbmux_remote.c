@@ -118,7 +118,7 @@ static struct remote_mux* remote_mux_new_with_fd(int fd)
 		close(fd);
 		usbfluxd_log(LL_ERROR, "ERROR: Could not set socket to non-blocking mode");
 		return NULL;
-	}	
+	}
 
 	struct remote_mux* remote = malloc(sizeof(struct remote_mux));
 	memset(remote, 0, sizeof(struct remote_mux));
@@ -260,7 +260,7 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 			if (r->id == remote_mux_id && r->state == REMOTE_LISTEN) {
 				remote = remote_mux_new_with_host(r->host, r->port);
 				break;
-			}	
+			}
 		} ENDFOREACH
 	}
 	if (remote) {
@@ -282,7 +282,7 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 	remote_send_plist_pkt(remote, 0, req);
 	plist_free(req);
 
-	return 0;	
+	return 0;
 }
 
 int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
@@ -733,7 +733,7 @@ static void *mdns_monitor_thread(void *user_data)
 	if (!CFNetServiceBrowserSearchForServices(browser, CFSTR("local"), CFSTR("_remote-mobdev._tcp"), &err)) {
 		goto monitor_thread_cleanup;
 	}
-	CFNetServiceBrowserInvalidate(browser);	
+	CFNetServiceBrowserInvalidate(browser);
 #endif
 #ifdef HAVE_AVAHI_CLIENT
 	AvahiClient *client = NULL;
@@ -873,7 +873,7 @@ static void remote_close(struct remote_mux *remote)
 
 	collection_remove(&remote_list, remote);
 
-	free(remote->host);	
+	free(remote->host);
 	free(remote->service_name);
 	free(remote->ob_buf);
 	free(remote->ib_buf);
@@ -1114,7 +1114,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		} else if (remote->last_command == REMOTE_CMD_SAVE_PAIR_RECORD) {
 			client_send_packet_data(remote->client, hdr, payload, payload_size);
 		} else if (remote->last_command == REMOTE_CMD_DELETE_PAIR_RECORD) {
-			client_send_packet_data(remote->client, hdr, payload, payload_size);	
+			client_send_packet_data(remote->client, hdr, payload, payload_size);
 		} else {
 			usbfluxd_log(LL_ERROR, "%s: ERROR: Unexpected message received in command state.", __func__);
 		}
@@ -1147,7 +1147,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		}
 		char s_devid[16];
 		sprintf(s_devid, "0x%08x", devid);
-		
+
 		if (type == MESSAGE_DEVICE_ADD) {
 			if (!plist_msg) {
 				struct device_info *di = (struct device_info*)payload;
@@ -1170,7 +1170,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 			plist_dict_remove_item(remote_device_list, s_devid);
 			client_device_remove(devid);
 			pthread_mutex_unlock(&remote_list_mutex);
-		}		
+		}
 	} else if (remote->state == REMOTE_CONNECTING1) {
 		uint32_t result = message_get_result(hdr, payload, payload_size, plist_msg);
 		usbfluxd_log(LL_DEBUG, "%s: got result %d for Connect request from remote", __func__, result);
