@@ -914,6 +914,7 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	collection_remove(&remote_list, remote);
 	client_remote_unset(remote);
 	if (remote->client) {
+		usbfluxd_log(LL_DEBUG, "Remote %p notifying close client %p", remote, remote->client);
 		client_notify_remote_close(remote->client);
 	}
 
@@ -993,6 +994,19 @@ plist_t usbmux_remote_copy_device_list()
 	plist_dict_foreach(remote_device_list, array_append_item_copy, devices);
 	pthread_mutex_unlock(&remote_list_mutex);
 	return devices;
+}
+
+void usbmux_remote_client_unset(struct mux_client *client)
+{
+	pthread_mutex_lock(&remote_list_mutex);
+	usbfluxd_log(LL_DEBUG, "%s: %p", __func__, client);
+	FOREACH(struct remote_mux *remote, &remote_list) {
+		if (remote->client == client) {
+			usbfluxd_log(LL_DEBUG, "Removing client %p from remote %p", client, remote);
+			remote->client = NULL;
+		}
+	} ENDFOREACH
+	pthread_mutex_unlock(&remote_list_mutex);
 }
 
 struct remote_inst_info {

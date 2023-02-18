@@ -242,7 +242,9 @@ void client_close(struct mux_client *client)
 		//device_abort_connect(client->connect_device, client);
 	}
 	close(client->fd);
+	usbmux_remote_client_unset(client);
 	if (client->remote) {
+		usbfluxd_log(LL_DEBUG, "Client %p notifying close on remote %p", client, client->remote);
 		usbmux_remote_notify_client_close(client->remote);
 	}
 	free(client->ob_buf);
@@ -1082,6 +1084,7 @@ void client_remote_unset(struct remote_mux *remote)
 	usbfluxd_log(LL_DEBUG, "%s: %p", __func__, remote);
 	FOREACH(struct mux_client *client, &client_list) {
 		if (client->remote == remote) {
+			usbfluxd_log(LL_DEBUG, "Removing remote %p from client %p", remote, client);
 			client->remote = NULL;
 		}
 	} ENDFOREACH

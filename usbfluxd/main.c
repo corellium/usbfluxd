@@ -329,6 +329,10 @@ static void parse_opts(int argc, char **argv)
 			opt_no_mdns = 1;
 			break;
 		case 'r': {
+			if (remote_host != NULL) {
+				free(remote_host);
+				remote_host = NULL;
+			}
 			char *colon = strchr(optarg, ':');
 			if (colon) {
 				size_t hostSize = (uintptr_t)(colon - optarg + 1);

@@ -76,6 +76,7 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 int usbmux_remote_save_pair_record(const char* record_id, plist_t req_plist, uint32_t tag, struct mux_client *client);
 int usbmux_remote_delete_pair_record(const char* record_id, uint32_t tag, struct mux_client *client);
 
+void usbmux_remote_client_unset(struct mux_client *client);
 void usbmux_remote_close(struct remote_mux *remote);
 void usbmux_remote_dispose(struct remote_mux *remote);
 
