@@ -986,7 +986,7 @@ static int array_append_item_copy(const char *key, plist_t value, void *context)
 	return 0;
 }
 
-plist_t usbmux_remote_get_device_list()
+plist_t usbmux_remote_copy_device_list()
 {
 	plist_t devices = plist_new_array();
 	pthread_mutex_lock(&remote_list_mutex);
@@ -1013,7 +1013,7 @@ static int remote_device_get_for_instance(const char* key, const plist_t value, 
 	return 0;
 }
 
-plist_t usbmux_remote_get_instances()
+plist_t usbmux_remote_copy_instances()
 {
 	plist_t dict = plist_new_dict();
 	pthread_mutex_lock(&remote_list_mutex);

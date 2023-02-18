@@ -66,8 +66,8 @@ struct remote_mux {
 void usbmux_remote_init(int no_mdns);
 void usbmux_remote_shutdown(void);
 
-plist_t usbmux_remote_get_device_list();
-plist_t usbmux_remote_get_instances();
+plist_t usbmux_remote_copy_device_list();
+plist_t usbmux_remote_copy_instances();
 
 int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, struct mux_client *client);
 

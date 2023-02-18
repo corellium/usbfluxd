@@ -90,7 +90,7 @@ static uint64_t plist_dict_get_uint_val(plist_t dict, const char *key)
 	return val;
 }
 
-static char *plist_dict_get_string_val(plist_t dict, const char *key)
+static char *plist_dict_copy_string_val(plist_t dict, const char *key)
 {
 	if (!dict || !_my_PLIST_IS_DICT(dict) || !key) return NULL;
 
@@ -200,9 +200,10 @@ static int handle_list(const char *arg)
 					if (plist_dict_get_bool_val(node, "IsUnix")) {
 						printf("Local");
 					} else {
-						char *host = plist_dict_get_string_val(node, "Host");
+						char *host = plist_dict_copy_string_val(node, "Host");
 						uint64_t port = plist_dict_get_uint_val(node, "Port");
 						printf("%s:%u", host, (uint16_t)port);
+						free(host);
 					}
 					plist_t devices = plist_dict_get_item(node, "Devices");
 					uint32_t num = plist_array_get_size(devices);
@@ -219,7 +220,9 @@ static int handle_list(const char *arg)
 					free(key);
 				}
 			} while (node);
+			free(iter);
 		}
+		plist_free(pl);
 	} else {
 		fprintf(stderr, "Failed to get list of instances.\n");
 	}
@@ -269,6 +272,8 @@ static int handle_add(const char *arg)
 		}
 	}
 
+	plist_free(pl);
+	free(remote_host);
 	return result;
 }
 
@@ -310,8 +315,10 @@ static int handle_del(const char *arg)
 		} else {
 			fprintf(stderr, "Failed to remove remote instance (Error code %d)\n", result);
 		}
+		plist_free(pl);
 	}
 
+	free(remote_host);
 	return result;
 }
 
