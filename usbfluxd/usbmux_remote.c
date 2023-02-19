@@ -859,27 +859,6 @@ void usbmux_remote_shutdown(void)
 	remote_device_list = NULL;
 }
 
-static void remote_close(struct remote_mux *remote)
-{
-	usbfluxd_log(LL_INFO, "%s: Disconnecting remote fd %d", __func__, remote->fd);
-#if 0
-	if(client->state == CLIENT_CONNECTING1 || client->state == CLIENT_CONNECTING2) {
-		usbfluxd_log(LL_INFO, "Client died mid-connect, aborting device %d connection", client->connect_device);
-		client->state = CLIENT_DEAD;
-		device_abort_connect(client->connect_device, client);
-	}
-#endif
-	close(remote->fd);
-
-	collection_remove(&remote_list, remote);
-
-	free(remote->host);
-	free(remote->service_name);
-	free(remote->ob_buf);
-	free(remote->ib_buf);
-	free(remote);
-}
-
 void usbmux_remote_close(struct remote_mux *remote)
 {
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
@@ -888,7 +867,7 @@ void usbmux_remote_close(struct remote_mux *remote)
 		client_notify_remote_close(client);
 	} else {
 		pthread_mutex_lock(&remote_list_mutex);
-		remote_close(remote);
+		usbmux_remote_dispose(remote);
 		pthread_mutex_unlock(&remote_list_mutex);
 	}
 }
@@ -910,7 +889,9 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 
 	close(remote->fd);
 
-	plist_dict_foreach(remote_device_list, remote_device_notify_remove, (void*)remote);
+	if (remote->is_listener && remote->host) {
+		plist_dict_foreach(remote_device_list, remote_device_notify_remove, (void*)remote);
+	}
 	collection_remove(&remote_list, remote);
 	client_remote_unset(remote);
 	if (remote->client) {
@@ -941,7 +922,7 @@ static void usbmux_remote_mark_dead(struct remote_mux *remote)
 void usbmux_remote_notify_client_close(struct remote_mux *remote)
 {
 	pthread_mutex_lock(&remote_list_mutex);
-	remote_close(remote);
+	usbmux_remote_dispose(remote);
 	pthread_mutex_unlock(&remote_list_mutex);
 }
 
