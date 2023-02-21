@@ -242,8 +242,8 @@ void client_close(struct mux_client *client)
 		//device_abort_connect(client->connect_device, client);
 	}
 	close(client->fd);
-	usbmux_remote_client_unset(client);
 	if (client->remote) {
+		usbmux_remote_clear_client(client->remote);
 		usbfluxd_log(LL_DEBUG, "Client %p notifying close on remote %p", client, client->remote);
 		usbmux_remote_notify_client_close(client->remote);
 	}
@@ -361,6 +361,11 @@ int client_send_plist_pkt(struct mux_client *client, plist_t plist)
 void client_set_remote(struct mux_client *client, struct remote_mux *remote)
 {
 	client->remote = remote;
+}
+
+void client_clear_remote(struct mux_client *client)
+{
+	client->remote = NULL;
 }
 
 int client_notify_connect(struct mux_client *client, enum usbmuxd_result result)
