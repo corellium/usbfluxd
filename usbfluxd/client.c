@@ -243,7 +243,6 @@ void client_close(struct mux_client *client)
 	}
 	close(client->fd);
 	if (client->remote) {
-		usbmux_remote_clear_client(client->remote);
 		usbfluxd_log(LL_DEBUG, "Client %p notifying close on remote %p", client, client->remote);
 		usbmux_remote_notify_client_close(client->remote);
 	}
@@ -360,6 +359,10 @@ int client_send_plist_pkt(struct mux_client *client, plist_t plist)
 
 void client_set_remote(struct mux_client *client, struct remote_mux *remote)
 {
+	if (client->remote && remote != client->remote) {
+		usbfluxd_log(LL_DEBUG, "clearing client %p from existing remote %p", client, client->remote);
+		usbmux_remote_clear_client(client->remote);
+	}
 	client->remote = remote;
 }
 
@@ -391,10 +394,15 @@ int client_notify_connect(struct mux_client *client, enum usbmuxd_result result)
 	return 0;
 }
 
-void client_notify_remote_close(struct mux_client *client)
+void client_notify_remote_close(struct mux_client *client, struct remote_mux *remote)
 {
 	usbfluxd_log(LL_DEBUG, "%s %p", __func__, client);
-	client_close(client);
+	if (remote == client->remote) {
+		client->remote = NULL;
+		client_close(client);
+	} else {
+		usbfluxd_log(LL_WARNING, "client_notify_remote_close from a remote (%p) that does not belong to this client (%p)", remote, client);
+	}
 }
 
 static int send_device_list(struct mux_client *client, uint32_t tag)

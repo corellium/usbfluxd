@@ -61,6 +61,7 @@ struct remote_mux {
 	uint16_t port;
 	struct mux_client* client;
 	uint64_t last_active;
+	int has_client; // Indicates this connection was initiated by a client.  Remove it if the client disappears.
 };
 
 void usbmux_remote_init(int no_mdns);

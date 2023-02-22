@@ -266,7 +266,6 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 	if (remote) {
 		remote->id = remote_mux_id;
 		remote->state = REMOTE_CONNECTING1;
-		remote->client = client;
 		client_set_remote(client, remote);
 		collection_add(&remote_list, remote);
 	}
@@ -314,7 +313,6 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
 		} ENDFOREACH
 	}
 	if (remote) {
-		client_set_remote(client, remote);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -330,7 +328,9 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
 
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_READ_BUID;
+		remote->has_client = 1;
 		remote->client = client;
+		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -379,7 +379,6 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 		}
 	}
 	if (remote) {
-		client_set_remote(client, remote);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -395,7 +394,9 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_READ_PAIR_RECORD;
+		remote->has_client = 1;
 		remote->client = client;
+		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -424,7 +425,6 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 		}
 	}
 	if (remote) {
-		client_set_remote(client, remote);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -436,7 +436,9 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 	int res = remote_send_plist_pkt(remote, tag, req_plist);
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_SAVE_PAIR_RECORD;
+		remote->has_client = 1;
 		remote->client = client;
+		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -465,7 +467,6 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 		}
 	}
 	if (remote) {
-		client_set_remote(client, remote);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -481,7 +482,9 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_DELETE_PAIR_RECORD;
+		remote->has_client = 1;
 		remote->client = client;
+		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -862,14 +865,9 @@ void usbmux_remote_shutdown(void)
 void usbmux_remote_close(struct remote_mux *remote)
 {
 	usbfluxd_log(LL_DEBUG, "%s", __func__);
-	struct mux_client *client = remote->client;
-	if (client) {
-		client_notify_remote_close(client);
-	} else {
-		pthread_mutex_lock(&remote_list_mutex);
-		usbmux_remote_dispose(remote);
-		pthread_mutex_unlock(&remote_list_mutex);
-	}
+	pthread_mutex_lock(&remote_list_mutex);
+	usbmux_remote_dispose(remote);
+	pthread_mutex_unlock(&remote_list_mutex);
 }
 
 static int remote_device_notify_remove(const char* key, const plist_t value, void *context)
@@ -885,7 +883,7 @@ static int remote_device_notify_remove(const char* key, const plist_t value, voi
 
 void usbmux_remote_dispose(struct remote_mux *remote)
 {
-	usbfluxd_log(LL_INFO, "%s: Disconnecting remote fd %d", __func__, remote->fd);
+	usbfluxd_log(LL_INFO, "%s: Disconnecting remote %p fd %d", __func__, remote, remote->fd);
 
 	close(remote->fd);
 
@@ -894,9 +892,8 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 	}
 	collection_remove(&remote_list, remote);
 	if (remote->client) {
-		client_clear_remote(remote->client);
 		usbfluxd_log(LL_DEBUG, "Remote %p notifying close client %p", remote, remote->client);
-		client_notify_remote_close(remote->client);
+		client_notify_remote_close(remote->client, remote);
 	}
 
 	if (remote->is_listener && remote->host) {
@@ -922,6 +919,7 @@ static void usbmux_remote_mark_dead(struct remote_mux *remote)
 void usbmux_remote_notify_client_close(struct remote_mux *remote)
 {
 	pthread_mutex_lock(&remote_list_mutex);
+	remote->client = NULL;
 	usbmux_remote_dispose(remote);
 	pthread_mutex_unlock(&remote_list_mutex);
 }
@@ -1266,7 +1264,7 @@ void usbmux_remote_process(int fd, short events)
 	pthread_mutex_lock(&remote_list_mutex);
 	/* find matching remote, but also reap dead remotes */
 	FOREACH(struct remote_mux *rm, &remote_list) {
-		if (rm->state == REMOTE_DEAD) {
+		if (rm->state == REMOTE_DEAD || ( rm->has_client && !rm->client )) {
 			usbmux_remote_dispose(rm);
 		} else if (rm->fd == fd) {
 			remote = rm;
