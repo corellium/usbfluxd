@@ -106,6 +106,19 @@ static void plist_dict_foreach(plist_t dict, plist_dict_foreach_func_t func, voi
 }
 /* }}} */
 
+static void _remote_init_client(struct remote_mux* remote, struct mux_client *client) {
+	if (remote->has_client) {
+		// This should never happen
+		usbfluxd_log(LL_FATAL, "_remote_init_client called on already initialized remote. Marking remote as dead.");
+		remote->state = REMOTE_DEAD;
+		return;
+	}
+	pthread_rwlock_init(&remote->client_lock, PTHREAD_RWLOCK_DEFAULT_NP);
+	remote->client = client;
+	remote->has_client = 1;
+	client_set_remote(client, remote);
+}
+
 static struct remote_mux* remote_mux_new_with_fd(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
@@ -266,7 +279,7 @@ int usbmux_remote_connect(uint32_t device_id, uint32_t tag, plist_t req_plist, s
 	if (remote) {
 		remote->id = remote_mux_id;
 		remote->state = REMOTE_CONNECTING1;
-		client_set_remote(client, remote);
+		_remote_init_client(remote, client);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -313,6 +326,7 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
 		} ENDFOREACH
 	}
 	if (remote) {
+		_remote_init_client(remote, client);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -328,9 +342,6 @@ int usbmux_remote_read_buid(uint32_t tag, struct mux_client *client)
 
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_READ_BUID;
-		remote->has_client = 1;
-		remote->client = client;
-		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -379,6 +390,7 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 		}
 	}
 	if (remote) {
+		_remote_init_client(remote, client);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -394,9 +406,6 @@ int usbmux_remote_read_pair_record(const char *record_id, uint32_t tag, struct m
 
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_READ_PAIR_RECORD;
-		remote->has_client = 1;
-		remote->client = client;
-		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -425,6 +434,7 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 		}
 	}
 	if (remote) {
+		_remote_init_client(remote, client);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -436,9 +446,6 @@ int usbmux_remote_save_pair_record(const char *record_id, plist_t req_plist, uin
 	int res = remote_send_plist_pkt(remote, tag, req_plist);
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_SAVE_PAIR_RECORD;
-		remote->has_client = 1;
-		remote->client = client;
-		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -467,6 +474,7 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 		}
 	}
 	if (remote) {
+		_remote_init_client(remote, client);
 		collection_add(&remote_list, remote);
 	}
 	pthread_mutex_unlock(&remote_list_mutex);
@@ -482,9 +490,6 @@ int usbmux_remote_delete_pair_record(const char *record_id, uint32_t tag, struct
 
 	if (res > 0) {
 		remote->last_command = REMOTE_CMD_DELETE_PAIR_RECORD;
-		remote->has_client = 1;
-		remote->client = client;
-		client_set_remote(client, remote);
 		return 0;
 	}
 	return -1;
@@ -891,10 +896,12 @@ void usbmux_remote_dispose(struct remote_mux *remote)
 		plist_dict_foreach(remote_device_list, remote_device_notify_remove, (void*)remote);
 	}
 	collection_remove(&remote_list, remote);
+	pthread_rwlock_rdlock(&remote->client_lock);
 	if (remote->client) {
 		usbfluxd_log(LL_DEBUG, "Remote %p notifying close client %p", remote, remote->client);
 		client_notify_remote_close(remote->client, remote);
 	}
+	pthread_rwlock_unlock(&remote->client_lock);
 
 	if (remote->is_listener && remote->host) {
 		usbfluxd_log(LL_NOTICE, "NOTE: remote %s:%d is no longer available.", remote->host, remote->port);
@@ -918,8 +925,10 @@ static void usbmux_remote_mark_dead(struct remote_mux *remote)
 
 void usbmux_remote_notify_client_close(struct remote_mux *remote)
 {
-	pthread_mutex_lock(&remote_list_mutex);
+	pthread_rwlock_wrlock(&remote->client_lock);
 	remote->client = NULL;
+	pthread_rwlock_unlock(&remote->client_lock);
+	pthread_mutex_lock(&remote_list_mutex);
 	usbmux_remote_dispose(remote);
 	pthread_mutex_unlock(&remote_list_mutex);
 }
@@ -977,7 +986,9 @@ plist_t usbmux_remote_copy_device_list()
 
 void usbmux_remote_clear_client(struct remote_mux *remote)
 {
+	pthread_rwlock_wrlock(&remote->client_lock);
 	remote->client = NULL;
+	pthread_rwlock_unlock(&remote->client_lock);
 }
 
 struct remote_inst_info {
@@ -1085,6 +1096,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 	}
 
 	if (remote->state == REMOTE_COMMAND) {
+		pthread_rwlock_rdlock(&remote->client_lock);
 		if (remote->last_command == REMOTE_CMD_LISTEN) {
 			uint32_t result = message_get_result(hdr, payload, payload_size, plist_msg);
 			if (result == 0) {
@@ -1103,6 +1115,7 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 		} else {
 			usbfluxd_log(LL_ERROR, "%s: ERROR: Unexpected message received in command state.", __func__);
 		}
+		pthread_rwlock_unlock(&remote->client_lock);
 		remote->last_command = -1;
 	} else if (remote->state == REMOTE_LISTEN) {
 		int type = 0;
@@ -1159,7 +1172,9 @@ static int remote_handle_command_result(struct remote_mux *remote, struct usbmux
 	} else if (remote->state == REMOTE_CONNECTING1) {
 		uint32_t result = message_get_result(hdr, payload, payload_size, plist_msg);
 		usbfluxd_log(LL_DEBUG, "%s: got result %d for Connect request from remote", __func__, result);
+		pthread_rwlock_rdlock(&remote->client_lock);
 		client_notify_connect(remote->client, result);
+		pthread_rwlock_unlock(&remote->client_lock);
 		if (result == 0) {
 			usbfluxd_log(LL_DEBUG, "Remote %d switching to CONNECTED state", remote->fd);
 			remote->state = REMOTE_CONNECTED;//ING2;
@@ -1307,14 +1322,18 @@ void usbmux_remote_process(int fd, short events)
 				usbfluxd_log(LL_DEBUG, "%s: read %d bytes from remote (fd %d) requested %u", __func__, r, remote->fd, remote->ib_capacity - remote->ib_size);
 				remote->ib_size += r;
 				//client_set_events(remote->client, POLLOUT); //client->events |= POLLOUT;
+				pthread_rwlock_rdlock(&remote->client_lock);
 				client_or_events(remote->client, POLLOUT);
+				pthread_rwlock_unlock(&remote->client_lock);
 			}
 		} else if (events & POLLOUT) {
 			// write to remote
 			usbfluxd_log(LL_DEBUG, "%s: sending %d bytes to remote (fd %d)", __func__, remote->ob_size, fd);
 			remote_process_send(remote);
 			//client_set_events(remote->client, POLLIN); //client->events |= POLLIN;
+			pthread_rwlock_rdlock(&remote->client_lock);
 			client_or_events(remote->client, POLLIN);
+			pthread_rwlock_unlock(&remote->client_lock);
 		} else {
 			usbfluxd_log(LL_DEBUG, "%s: called but no incoming or outgoing traffic.", __func__);
 			usbmux_remote_close(remote);

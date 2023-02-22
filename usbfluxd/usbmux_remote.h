@@ -61,6 +61,7 @@ struct remote_mux {
 	uint16_t port;
 	struct mux_client* client;
 	uint64_t last_active;
+	pthread_rwlock_t client_lock;
 	int has_client; // Indicates this connection was initiated by a client.  Remove it if the client disappears.
 };
 
