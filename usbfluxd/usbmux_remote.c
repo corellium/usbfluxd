@@ -113,7 +113,7 @@ static void _remote_init_client(struct remote_mux* remote, struct mux_client *cl
 		remote->state = REMOTE_DEAD;
 		return;
 	}
-	pthread_rwlock_init(&remote->client_lock, PTHREAD_RWLOCK_DEFAULT_NP);
+	pthread_rwlock_init(&remote->client_lock, NULL);
 	remote->client = client;
 	remote->has_client = 1;
 	client_set_remote(client, remote);
