@@ -314,7 +314,7 @@
 				CODE_SIGN_IDENTITY = "Mac Developer";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = XG264R6QP8;
+				DEVELOPMENT_TEAM = TTAVJYQ72B;
 				INFOPLIST_FILE = USBFlux/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -334,7 +334,7 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = XG264R6QP8;
+				DEVELOPMENT_TEAM = TTAVJYQ72B;
 				INFOPLIST_FILE = USBFlux/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
