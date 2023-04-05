@@ -7,8 +7,8 @@ if test -n $CONFIG_VERSION; then
 fi
 
 make
-codesign -s "Developer ID Application: Corellium LLC (XG264R6QP8)" usbfluxd/usbfluxd
-codesign -s "Developer ID Application: Corellium LLC (XG264R6QP8)" tools/usbfluxctl
+codesign -s "Developer ID Application: Corellium, Inc (TTAVJYQ72B)" usbfluxd/usbfluxd
+codesign -s "Developer ID Application: Corellium, Inc (TTAVJYQ72B)" tools/usbfluxctl
 
 COMMIT=`git rev-parse HEAD`
 if test -z $COMMIT; then

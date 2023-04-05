@@ -11,7 +11,7 @@ BUILDDIR="USBFlux/build/Release"
 # build the daemon
 make clean && make
 # sign it
-codesign -s "Developer ID Application: Corellium LLC (XG264R6QP8)" usbfluxd/usbfluxd
+codesign -s "Developer ID Application: Corellium, Inc (TTAVJYQ72B)" usbfluxd/usbfluxd tools/usbmuxd
 
 COMMIT=`git rev-parse HEAD`
 if test -z $COMMIT; then
@@ -65,7 +65,7 @@ zip "$ZIP_NAME_MDNS" README README.md
 cp domain.conf $SRCDIR/USBFlux.app/Contents/Resources/domain.conf
 
 # resign the app
-codesign --force --sign "Developer ID Application: Corellium LLC (XG264R6QP8)" --entitlements USBFlux/build/USBFlux.build/Release/USBFlux.build/USBFlux.app.xcent --requirements "=designated => anchor apple generic  and identifier \"\$self.identifier\" and ((cert leaf[field.1.2.840.113635.100.6.1.9] exists) or ( certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists  and certificate leaf[subject.OU] = \"XG264R6QP8\" ))" --timestamp=none $SRCDIR/USBFlux.app
+codesign --force --sign "Developer ID Application: Corellium, Inc (TTAVJYQ72B)" --entitlements USBFlux/build/USBFlux.build/Release/USBFlux.build/USBFlux.app.xcent --requirements "=designated => anchor apple generic  and identifier \"\$self.identifier\" and ((cert leaf[field.1.2.840.113635.100.6.1.9] exists) or ( certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists  and certificate leaf[subject.OU] = \"TTAVJYQ72B\" ))" --timestamp=none $SRCDIR/USBFlux.app
 
 ./create-dmg/create-dmg --volname "USBFlux ${VER}" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon " " 340 0 --icon USBFlux.pdf 0 200 $DMG_NAME_API ${SRCDIR}
 
