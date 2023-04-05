@@ -1,0 +1,67 @@
+COMMIT=$(shell git rev-parse HEAD || echo nogit)
+APPLE_ID := id@corellium.com
+TEAM_ID := TTAVJYQ72B
+APP_PASSWORD := ""
+VER := $(shell grep AC_INIT configure.ac |cut -d "[" -f3 |cut -d "]" -f 1)
+
+.PHONY: all clean
+all: build/USBFlux-$(COMMIT).dmg build/USBFlux-onsite-$(COMMIT).dmg build/USBFlux-$(COMMIT).zip build/USBFlux-onsite-$(COMMIT).zip
+
+create-dmg/create-dmg:
+	rm -rf create-dmg
+	curl -L https://github.com/nikias/create-dmg/archive/master.zip > create-dmg.zip
+	unzip create-dmg.zip
+	mv create-dmg-master create-dmg
+	rm -f create-dmg.zip
+	chmod 755 create-dmg/create-dmg
+
+build/onsite build/cloud:
+	mkdir -p $@
+
+build/%/README: README | build/%
+	cp $^ $@
+
+build/%/README.md: README.md | build/%
+	cp $^ $@
+
+build/%/Applications: | build/%
+	ln -s /Applications $@
+
+USBFlux/build/usbflux/Release/USBFlux.app: tools/usbfluxctl usbfluxd/usbfluxd USBFlux/USBFlux.xcodeproj $(wildcard USBFlux/USBFlux/*)
+	xcodebuild -project USBFlux/USBFlux.xcodeproj -target USBFlux -configuration Release OBJROOT=build/usbflux SYMROOT=build/usbflux
+
+build/onsite/USBFlux.app build/cloud/USBFlux.app: USBFlux/build/usbflux/Release/USBFlux.app | build/onsite build/cloud
+	rm -rf "$(dir $@)/tmp"
+	mkdir -p "$(dir $@)/tmp"
+	cp -a $< "$(dir $@)/tmp"
+	if [ "$@" == build/onsite/USBFlux.app ]; then touch "$(dir $@)"/tmp/USBFlux.app/Contents/Resources/domain.conf; fi
+	codesign --options runtime --timestamp --force --sign "Developer ID Application: Corellium, Inc (TTAVJYQ72B)" --requirements "=designated => anchor apple generic  and identifier \"$$self.identifier\" and ((cert leaf[field.1.2.840.113635.100.6.1.9] exists) or ( certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists  and certificate leaf[subject.OU] = \"TTAVJYQ72B\" ))" "$(dir $@)/tmp/$(notdir $@)"/Contents/Resources/usbfluxctl "$(dir $@)/tmp/$(notdir $@)"/Contents/Resources/usbfluxd
+	codesign --options runtime --timestamp --force --sign "Developer ID Application: Corellium, Inc (TTAVJYQ72B)" --requirements "=designated => anchor apple generic  and identifier \"$$self.identifier\" and ((cert leaf[field.1.2.840.113635.100.6.1.9] exists) or ( certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists  and certificate leaf[subject.OU] = \"TTAVJYQ72B\" ))" "$(dir $@)/tmp/$(notdir $@)"
+	cd "$(dir $@)"/tmp; zip -r USBFlux.zip USBFlux.app
+	xcrun notarytool submit --wait --apple-id $(APPLE_ID) --team-id $(TEAM_ID)  --password "$(APP_PASSWORD)" "$(dir $@)"/tmp/USBFlux.zip
+	xcrun stapler staple "$(dir $@)"/tmp/USBFlux.app
+	mv "$(dir $@)"/tmp/USBFlux.app $@
+	rm -rf "$(dir $@)"/tmp
+
+build/USBFlux.dmg: build/cloud/USBFlux.app build/cloud/README build/cloud/README.md build/cloud/Applications | create-dmg/create-dmg
+	./create-dmg/create-dmg --no-internet-enable --volname "USBFlux $(VER)" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon "Applications" 340 0 --icon USBFlux.pdf 0 200 $@ $(dir $^)
+
+build/USBFlux-onsite.dmg: build/onsite/USBFlux.app build/onsite/README build/onsite/README.md build/onsite/Applications | create-dmg/create-dmg
+	./create-dmg/create-dmg --no-internet-enable --volname "USBFlux $(VER)" --volicon USBFlux/VolumeIcon.icns --background USBFlux/background.png --window-size 800 421 --icon-size 128 --icon USBFlux.app 0 0 --icon "Applications" 340 0 --icon USBFlux.pdf 0 200 $@ $(dir $^)
+
+build/USBFlux.zip: build/cloud/USBFlux.app build/cloud/README build/cloud/README.md | create-dmg/create-dmg
+	rm -f $@
+	cd build/cloud; zip -r ../$(notdir $@) $(notdir $^)
+
+build/USBFlux-onsite.zip: build/onsite/USBFlux.app build/onsite/README build/onsite/README.md | create-dmg/create-dmg
+	rm -f $@
+	cd build/onsite; zip -r ../$(notdir $@) $(notdir $^)
+
+build/%-$(COMMIT).dmg: build/%.dmg
+	ln $^ $@
+
+build/%-$(COMMIT).zip: build/%.zip
+	ln $^ $@
+
+clean:
+	rm -rf USBFlux/build/usbflux build/

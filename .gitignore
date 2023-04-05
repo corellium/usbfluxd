@@ -40,6 +40,7 @@ USBFlux/build
 USBFlux/USBFlux.xcodeproj/project.xcworkspace/xcshareddata/
 USBFlux/USBFlux.xcodeproj/project.xcworkspace/xcuserdata/
 USBFlux/USBFlux.xcodeproj/xcuserdata/
+build/
 *.zip
 *.dmg
 create-dmg
