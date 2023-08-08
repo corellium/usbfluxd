@@ -16,12 +16,12 @@ AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
-PKG_CHECK_MODULES(libplist, libplist >= 2.2.0,
+PKG_CHECK_MODULES(libplist, libplist >= 2.3.0,
   [
     AC_DEFINE([HAVE_LIBPLIST], [1], [Use libplist])
     LIBPLIST=libplist
   ], [
-    PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.2.0, [
+    PKG_CHECK_MODULES(libplist, libplist-2.0 >= 2.3.0, [
     LIBPLIST=libplist-2.0
     AC_DEFINE([HAVE_LIBPLIST_2_0], [1], [Use libplist-2.0])
   ])],
