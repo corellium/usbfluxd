@@ -26,6 +26,14 @@ PKG_CHECK_MODULES(libplist, libplist >= 2.2.0,
     AC_DEFINE([HAVE_LIBPLIST_2_0], [1], [Use libplist-2.0])
   ])],
 )
+
+if test "x$LIBPLIST" != "x"; then
+  AC_CHECK_DECLS([plist_format_typedef], [], [], [
+  #include <plist/plist.h>
+  plist_format_t plist_format_typedef;
+])
+fi
+
 AC_CHECK_LIB(pthread, [pthread_create, pthread_mutex_lock], [AC_SUBST(libpthread_LIBS,[-lpthread])], [AC_MSG_ERROR([libpthread is required to build usbfluxd])])
 
 AC_SEARCH_LIBS([fmin], [m])

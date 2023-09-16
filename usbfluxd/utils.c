@@ -302,7 +302,7 @@ int plist_read_from_filename(plist_t *plist, const char *filename)
 	return 1;
 }
 
-int plist_write_to_filename(plist_t plist, const char *filename, enum plist_format_t format)
+int plist_write_to_filename(plist_t plist, const char *filename, plist_format_t format)
 {
 	char *buffer = NULL;
 	uint32_t length;
