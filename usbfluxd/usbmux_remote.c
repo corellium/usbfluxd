@@ -958,6 +958,10 @@ void usbmux_remote_get_fds(struct fdlist *list)
 				pthread_t th;
 				if (pthread_create(&th, NULL, check_remote_func, remote) != 0) {
 					usbfluxd_log(LL_ERROR, "%s: Failed to create thread to check remote", __func__);
+				} else {
+					if (pthread_detach(th) != 0) {
+						usbfluxd_log(LL_ERROR, "%s: Failed to detach thread to check remote", __func__);
+					}
 				}
 			}
 			remote->last_active = now;
