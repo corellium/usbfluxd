@@ -501,7 +501,7 @@ static int remote_mux_service_add(const char *service_name, const char *host_nam
 	struct remote_mux *remote = NULL;
 	pthread_mutex_lock(&remote_list_mutex);
 	FOREACH(struct remote_mux *r, &remote_list) {
-		if (!r->is_unix && r->is_listener && ((strcmp(r->service_name, service_name) == 0) || ((strcmp(r->host, host_name) == 0) && (r->port == port)))) {
+		if (!r->is_unix && r->is_listener && ((strcmp(r->service_name, service_name) == 0) && ((strcmp(r->host, host_name) == 0) && (r->port == port)))) {
 			remote = r;
 			break;
 		}
